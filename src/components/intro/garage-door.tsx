@@ -29,62 +29,21 @@ const LIFT_MAX = DOOR_H + ARC + 0.6;
 const WALL_W = 30;
 const WALL_H = 12;
 
-function makeWallMaps() {
-  const S = 1024;
-  const TILE = 4;
-  const blockW = S / 6;
-  const blockH = S / 12;
+const PANEL_W = 2.5;
+const PANEL_H = 1.2;
+const PANEL_GAP = 0.016;
+const PORTAL_HALF = 2.75;
+const PORTAL_TOP = 3.6;
+
+function makeConcreteMaps() {
+  const S = 512;
 
   const color = document.createElement("canvas");
   color.width = S;
   color.height = S;
   const c = color.getContext("2d")!;
-  c.fillStyle = "#d9d4c8";
+  c.fillStyle = "#c8c4ba";
   c.fillRect(0, 0, S, S);
-
-  const rows = S / blockH;
-  for (let row = 0; row < rows; row++) {
-    const y = row * blockH;
-    const off = row % 2 ? blockW / 2 : 0;
-    for (let bx = -1; bx < S / blockW + 1; bx++) {
-      const x = bx * blockW + off;
-      const tone = (Math.random() - 0.5) * 14;
-      c.fillStyle = `rgb(${217 + tone},${212 + tone},${200 + tone})`;
-      c.fillRect(x + 2, y + 2, blockW - 4, blockH - 4);
-      c.fillStyle = "rgba(255,255,255,0.06)";
-      c.fillRect(x + 2, y + 2, blockW - 4, 2);
-      c.fillStyle = "rgba(0,0,0,0.05)";
-      c.fillRect(x + 2, y + blockH - 4, blockW - 4, 2);
-    }
-    c.fillStyle = "rgba(90,84,72,0.35)";
-    c.fillRect(0, y, S, 2);
-  }
-  for (let row = 0; row < rows; row++) {
-    const y = row * blockH;
-    const off = row % 2 ? blockW / 2 : 0;
-    c.fillStyle = "rgba(90,84,72,0.28)";
-    for (let bx = -1; bx < S / blockW + 1; bx++) {
-      c.fillRect(bx * blockW + off, y, 2, blockH);
-    }
-  }
-  for (let i = 0; i < 900; i++) {
-    const x = Math.random() * S;
-    const y = Math.random() * S;
-    const l = Math.random() > 0.5;
-    c.fillStyle = `rgba(${l ? "255,255,255" : "60,55,45"},${0.02 + Math.random() * 0.04})`;
-    c.fillRect(x, y, 1 + Math.random() * 3, 1 + Math.random() * 3);
-  }
-  for (let i = 0; i < 40; i++) {
-    const x = Math.random() * S;
-    const y = Math.random() * S;
-    const w = 20 + Math.random() * 60;
-    const h = 60 + Math.random() * 260;
-    const g = c.createLinearGradient(0, y, 0, y + h);
-    g.addColorStop(0, "rgba(95,88,74,0.05)");
-    g.addColorStop(1, "rgba(95,88,74,0)");
-    c.fillStyle = g;
-    c.fillRect(x, y, w, h);
-  }
 
   const normal = document.createElement("canvas");
   normal.width = S;
@@ -92,29 +51,102 @@ function makeWallMaps() {
   const n = normal.getContext("2d")!;
   n.fillStyle = "rgb(128,128,255)";
   n.fillRect(0, 0, S, S);
-  for (let row = 0; row < rows; row++) {
-    const y = row * blockH;
-    n.fillStyle = "rgb(128,100,250)";
-    n.fillRect(0, (y - 1 + S) % S, S, 2);
-    n.fillStyle = "rgb(128,156,250)";
-    n.fillRect(0, y + 1, S, 2);
+
+  const rough = document.createElement("canvas");
+  rough.width = S;
+  rough.height = S;
+  const r = rough.getContext("2d")!;
+  r.fillStyle = "#b0b0b0";
+  r.fillRect(0, 0, S, S);
+
+  for (let i = 0; i < 22; i++) {
+    const x = Math.random() * S;
+    const y = Math.random() * S;
+    const rad = 60 + Math.random() * 190;
+    const light = Math.random() > 0.45;
+    const g = c.createRadialGradient(x, y, 0, x, y, rad);
+    g.addColorStop(0, `rgba(${light ? "255,255,255" : "62,58,50"},${0.02 + Math.random() * 0.04})`);
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    c.fillStyle = g;
+    c.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    const rg = r.createRadialGradient(x, y, 0, x, y, rad);
+    rg.addColorStop(0, `rgba(${light ? "140,140,140" : "205,205,205"},0.12)`);
+    rg.addColorStop(1, "rgba(0,0,0,0)");
+    r.fillStyle = rg;
+    r.fillRect(x - rad, y - rad, rad * 2, rad * 2);
   }
-  for (let i = 0; i < 1400; i++) {
-    const off = Math.round((Math.random() - 0.5) * 14);
+
+  for (let i = 0; i < 9; i++) {
+    const x = Math.random() * S;
+    const len = 90 + Math.random() * 340;
+    const w = 5 + Math.random() * 20;
+    const g = c.createLinearGradient(0, 0, 0, len);
+    g.addColorStop(0, `rgba(92,86,72,${0.02 + Math.random() * 0.035})`);
+    g.addColorStop(1, "rgba(92,86,72,0)");
+    c.fillStyle = g;
+    c.fillRect(x, 0, w, len);
+  }
+
+  for (let i = 0; i < 2600; i++) {
+    const x = Math.random() * S;
+    const y = Math.random() * S;
+    const l = Math.random() > 0.5;
+    c.fillStyle = `rgba(${l ? "255,255,255" : "48,44,38"},${0.015 + Math.random() * 0.03})`;
+    c.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+    const off = Math.round((Math.random() - 0.5) * 12);
     n.fillStyle = `rgba(${128 + off},${128 - off},255,0.10)`;
-    n.fillRect(Math.random() * S, Math.random() * S, 2 + Math.random() * 4, 2 + Math.random() * 4);
+    n.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
   }
+
+  for (let i = 0; i < 70; i++) {
+    const x = Math.random() * S;
+    const y = Math.random() * S;
+    const rad = 0.6 + Math.random() * 1.6;
+    c.fillStyle = `rgba(40,36,30,${0.12 + Math.random() * 0.2})`;
+    c.beginPath();
+    c.arc(x, y, rad, 0, Math.PI * 2);
+    c.fill();
+    n.fillStyle = "rgba(128,112,255,0.5)";
+    n.beginPath();
+    n.arc(x, y, rad, 0, Math.PI * 2);
+    n.fill();
+  }
+
+  for (const [hx, hy] of [
+    [0.16, 0.3],
+    [0.84, 0.3],
+    [0.16, 0.7],
+    [0.84, 0.7],
+  ]) {
+    const x = hx * S;
+    const y = hy * S;
+    const g = c.createRadialGradient(x, y, 1, x, y, 9);
+    g.addColorStop(0, "rgba(70,64,54,0.5)");
+    g.addColorStop(0.55, "rgba(70,64,54,0.2)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    c.fillStyle = g;
+    c.fillRect(x - 9, y - 9, 18, 18);
+    const ng = n.createRadialGradient(x, y, 0, x, y, 8);
+    ng.addColorStop(0, "rgba(128,96,255,0.8)");
+    ng.addColorStop(1, "rgba(128,128,255,0)");
+    n.fillStyle = ng;
+    n.fillRect(x - 8, y - 8, 16, 16);
+  }
+
+  c.strokeStyle = "rgba(60,56,48,0.10)";
+  c.lineWidth = 14;
+  c.strokeRect(7, 7, S - 14, S - 14);
+  c.strokeStyle = "rgba(60,56,48,0.12)";
+  c.lineWidth = 4;
+  c.strokeRect(2, 2, S - 4, S - 4);
 
   const toTex = (cv: HTMLCanvasElement, srgb = false) => {
     const t = new THREE.CanvasTexture(cv);
-    t.wrapS = THREE.RepeatWrapping;
-    t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(1 / TILE, 1 / TILE);
     t.anisotropy = 8;
     if (srgb) t.colorSpace = THREE.SRGBColorSpace;
     return t;
   };
-  return { map: toTex(color, true), normalMap: toTex(normal) };
+  return { map: toTex(color, true), normalMap: toTex(normal), roughnessMap: toTex(rough) };
 }
 
 const SLAT_GAP = 0.014;
@@ -184,9 +216,9 @@ function makeFoliageAlpha() {
 }
 
 function Facade() {
-  const wallMaps = useMemo(makeWallMaps, []);
   const phase = useIntroStore((s) => s.phase);
   const lit = phase === "opening" || phase === "inside";
+
   const wallGeo = useMemo(() => {
     const shape = new THREE.Shape();
     shape.moveTo(-WALL_W / 2, 0);
@@ -204,89 +236,105 @@ function Facade() {
     return new THREE.ShapeGeometry(shape);
   }, []);
 
-  const shadeMap = useMemo(() => {
-    const S = 1024;
-    const cv = document.createElement("canvas");
-    cv.width = S;
-    cv.height = S;
-    const ctx = cv.getContext("2d")!;
-    const g = ctx.createLinearGradient(0, S, 0, 0);
-    g.addColorStop(0, "rgba(255,255,255,0.5)");
-    g.addColorStop(0.18, "rgba(255,255,255,0.14)");
-    g.addColorStop(0.5, "rgba(255,255,255,0)");
-    g.addColorStop(1, "rgba(255,255,255,0.2)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, S, S);
+  const mats = useMemo(
+    () =>
+      Array.from({ length: 4 }, makeConcreteMaps).flatMap((maps) =>
+        [0.97, 1.02].map((k) => {
+          const m = new THREE.MeshStandardMaterial({
+            ...maps,
+            roughness: 1,
+            color: new THREE.Color(k, k, k * 0.99),
+          });
+          m.normalScale.set(0.7, 0.7);
+          return m;
+        })
+      ),
+    []
+  );
 
-    for (let i = 0; i < 30; i++) {
-      const x = Math.random() * S;
-      const len = 30 + Math.random() * 130;
-      const w = 4 + Math.random() * 16;
-      const sg = ctx.createLinearGradient(0, 0, 0, len);
-      sg.addColorStop(0, `rgba(255,255,255,${0.08 + Math.random() * 0.14})`);
-      sg.addColorStop(1, "rgba(255,255,255,0)");
-      ctx.fillStyle = sg;
-      ctx.fillRect(x, 0, w, len);
-    }
-
-    const u = (wx: number) => ((wx + WALL_W / 2) / WALL_W) * S;
-    const v = (wy: number) => (1 - wy / WALL_H) * S;
-    for (const side of [-1, 1]) {
-      for (let i = 0; i < 4; i++) {
-        const x = u(side * (DOOR_W / 2 + 0.3) + (Math.random() - 0.5) * 0.6);
-        const y0 = v(DOOR_H + 0.05);
-        const len = 40 + Math.random() * 80;
-        const sg = ctx.createLinearGradient(0, y0, 0, y0 + len);
-        sg.addColorStop(0, `rgba(255,255,255,${0.1 + Math.random() * 0.14})`);
-        sg.addColorStop(1, "rgba(255,255,255,0)");
-        ctx.fillStyle = sg;
-        ctx.fillRect(x, y0, 3 + Math.random() * 6, len);
+  const panels = useMemo(() => {
+    const list: { x: number; y: number; w: number; h: number }[] = [];
+    const push = (x0: number, x1: number, y0: number, y1: number) => {
+      list.push({
+        x: (x0 + x1) / 2,
+        y: (y0 + y1) / 2,
+        w: x1 - x0 - PANEL_GAP,
+        h: y1 - y0 - PANEL_GAP,
+      });
+    };
+    const cols = Math.round(WALL_W / PANEL_W);
+    const rows = Math.round(WALL_H / PANEL_H);
+    for (let ri = 0; ri < rows; ri++) {
+      for (let ci = 0; ci < cols; ci++) {
+        const x0 = -WALL_W / 2 + ci * PANEL_W;
+        const x1 = x0 + PANEL_W;
+        const y0 = ri * PANEL_H;
+        const y1 = y0 + PANEL_H;
+        if (y0 >= PORTAL_TOP - 1e-4 || x1 <= -PORTAL_HALF + 1e-4 || x0 >= PORTAL_HALF - 1e-4) {
+          push(x0, x1, y0, y1);
+          continue;
+        }
+        if (x0 < -PORTAL_HALF) push(x0, -PORTAL_HALF, y0, y1);
+        if (x1 > PORTAL_HALF) push(PORTAL_HALF, x1, y0, y1);
       }
     }
-    const y0 = v(DOOR_H + 0.28);
-    for (let i = 0; i < 9; i++) {
-      const x = u(-DOOR_W / 2 + 0.2 + Math.random() * (DOOR_W - 0.4));
-      const len = 14 + Math.random() * 30;
-      const sg = ctx.createLinearGradient(0, y0, 0, y0 + len);
-      sg.addColorStop(0, `rgba(255,255,255,${0.08 + Math.random() * 0.1})`);
-      sg.addColorStop(1, "rgba(255,255,255,0)");
-      ctx.fillStyle = sg;
-      ctx.fillRect(x, y0, 2 + Math.random() * 5, len);
-    }
-
-    const t = new THREE.CanvasTexture(cv);
-    t.repeat.set(1 / WALL_W, 1 / WALL_H);
-    t.offset.set(0.5, 0);
-    return t;
+    return list;
   }, []);
+
+  const portalMat = useMemo(
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        color: "#2c3137",
+        metalness: 0.3,
+        roughness: 0.45,
+        clearcoat: 0.3,
+        clearcoatRoughness: 0.3,
+        envMapIntensity: 0.9,
+      }),
+    []
+  );
 
   return (
     <group>
-      <mesh geometry={wallGeo} castShadow receiveShadow>
-        <meshStandardMaterial {...wallMaps} roughness={0.92} normalScale={new THREE.Vector2(0.8, 0.8)} />
-      </mesh>
-      <mesh geometry={wallGeo} position-z={0.008}>
-        <meshBasicMaterial color="#000000" transparent alphaMap={shadeMap} opacity={0.32} depthWrite={false} />
+      <mesh geometry={wallGeo} receiveShadow>
+        <meshStandardMaterial color="#57534b" roughness={1} />
       </mesh>
 
-      {[-1, 1].map((s) => (
+      {panels.map((p, i) => (
         <mesh
-          key={s}
-          position={[s * (DOOR_W / 2 - 0.07), DOOR_H / 2, -0.22]}
+          key={i}
+          position={[p.x, p.y, 0.022]}
+          material={mats[(i * 31 + 7) % mats.length]}
           castShadow
           receiveShadow
         >
-          <boxGeometry args={[0.14, DOOR_H, 0.14]} />
-          <meshStandardMaterial color="#33373c" metalness={0.6} roughness={0.55} />
+          <boxGeometry args={[p.w, p.h, 0.045]} />
         </mesh>
       ))}
 
-      <mesh position={[0, DOOR_H - 0.14, -0.2]} castShadow receiveShadow>
-        <boxGeometry args={[DOOR_W, 0.28, 0.12]} />
-        <meshStandardMaterial color="#2e3237" metalness={0.6} roughness={0.5} />
+      {[-1, 1].map((s) => (
+        <mesh key={`plinth${s}`} position={[s * 8.875, 0.26, 0.045]} castShadow receiveShadow>
+          <boxGeometry args={[12.25, 0.52, 0.05]} />
+          <meshStandardMaterial color="#8d887d" roughness={0.98} />
+        </mesh>
+      ))}
+
+      {[-1, 1].map((s) => (
+        <mesh
+          key={`jamb${s}`}
+          position={[s * (DOOR_W / 2 + (PORTAL_HALF - DOOR_W / 2) / 2), PORTAL_TOP / 2, 0]}
+          material={portalMat}
+          castShadow
+          receiveShadow
+        >
+          <boxGeometry args={[PORTAL_HALF - DOOR_W / 2, PORTAL_TOP, 0.14]} />
+        </mesh>
+      ))}
+      <mesh position={[0, (DOOR_H + PORTAL_TOP) / 2, 0]} material={portalMat} castShadow receiveShadow>
+        <boxGeometry args={[PORTAL_HALF * 2, PORTAL_TOP - DOOR_H, 0.14]} />
       </mesh>
 
-      <group position={[0, DOOR_H + 0.95, 0.08]}>
+      <group position={[0, DOOR_H + 0.95, 0.12]}>
         <mesh castShadow>
           <boxGeometry args={[0.42, 0.15, 0.14]} />
           <meshStandardMaterial color="#26292d" metalness={0.5} roughness={0.5} />
@@ -330,6 +378,7 @@ function Facade() {
   );
 }
 
+
 function FoliageShadow() {
   const alpha = useMemo(makeFoliageAlpha, []);
   const mesh = useRef<THREE.Mesh>(null);
@@ -342,7 +391,7 @@ function FoliageShadow() {
   });
 
   return (
-    <mesh ref={mesh} position={[-3.8, 4.6, 0.02]}>
+    <mesh ref={mesh} position={[-3.8, 4.6, 0.06]}>
       <planeGeometry args={[7, 6]} />
       <meshBasicMaterial color="#3a3226" transparent alphaMap={alpha} opacity={0.12} depthWrite={false} />
     </mesh>
@@ -741,7 +790,7 @@ function Details() {
         </group>
       ))}
 
-      <group position={[2.62, 1.24, 0.028]}>
+      <group position={[2.62, 1.24, 0.1]}>
         <mesh castShadow>
           <boxGeometry args={[0.13, 0.19, 0.05]} />
           <meshStandardMaterial color="#2c2f33" metalness={0.5} roughness={0.5} />
@@ -752,16 +801,16 @@ function Details() {
         </mesh>
       </group>
 
-      <mesh position={[0, DOOR_H + 2.45, 0.032]} castShadow>
+      <mesh position={[0, DOOR_H + 2.45, 0.065]} castShadow>
         <cylinderGeometry args={[0.017, 0.017, 2.6, 10]} />
         <meshStandardMaterial color="#9b978c" metalness={0.4} roughness={0.6} />
       </mesh>
-      <mesh position={[0, DOOR_H + 1.14, 0.04]} castShadow>
+      <mesh position={[0, DOOR_H + 1.14, 0.075]} castShadow>
         <boxGeometry args={[0.11, 0.11, 0.07]} />
         <meshStandardMaterial color="#8e8a80" metalness={0.4} roughness={0.6} />
       </mesh>
 
-      <group position={[-2.2, 3.82, 0.022]}>
+      <group position={[-2.2, 3.82, 0.075]}>
         <mesh castShadow>
           <boxGeometry args={[0.54, 0.38, 0.045]} />
           <meshStandardMaterial color="#87837a" metalness={0.35} roughness={0.7} />
@@ -908,7 +957,7 @@ function makeWallSignMap() {
 function WallSign() {
   const map = useMemo(makeWallSignMap, []);
   return (
-    <group position={[0, DOOR_H + 0.52, 0.045]}>
+    <group position={[0, DOOR_H + 0.52, 0.095]}>
       <mesh castShadow receiveShadow>
         <boxGeometry args={[1.96, 0.42, 0.03]} />
         <meshStandardMaterial color="#d6d2c6" roughness={0.7} metalness={0.15} />
