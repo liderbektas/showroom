@@ -129,46 +129,64 @@ export function startMotor() {
 
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(0.0001, t);
-  gain.gain.exponentialRampToValueAtTime(0.16, t + 0.5);
+  gain.gain.exponentialRampToValueAtTime(0.2, t + 0.4);
   gain.connect(master);
 
-  const lp = ctx.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.value = 260;
-  lp.connect(gain);
+  const hp = ctx.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = 160;
+  hp.connect(gain);
 
   const osc1 = ctx.createOscillator();
   osc1.type = "sawtooth";
-  osc1.frequency.setValueAtTime(48, t);
-  osc1.frequency.linearRampToValueAtTime(55, t + 3);
+  osc1.frequency.value = 118;
   const osc2 = ctx.createOscillator();
   osc2.type = "sawtooth";
-  osc2.frequency.setValueAtTime(97, t);
-  osc2.frequency.linearRampToValueAtTime(111, t + 3);
-  const oscGain = ctx.createGain();
-  oscGain.gain.value = 0.5;
-  osc1.connect(oscGain);
-  osc2.connect(oscGain);
-  oscGain.connect(lp);
+  osc2.frequency.value = 119.7;
+  const humLp = ctx.createBiquadFilter();
+  humLp.type = "lowpass";
+  humLp.frequency.value = 750;
+  const humGain = ctx.createGain();
+  humGain.gain.value = 0.09;
+  osc1.connect(humLp);
+  osc2.connect(humLp);
+  humLp.connect(humGain).connect(hp);
 
-  const lfo = ctx.createOscillator();
-  lfo.frequency.value = 7;
-  const lfoGain = ctx.createGain();
-  lfoGain.gain.value = 40;
-  lfo.connect(lfoGain).connect(lp.frequency);
+  const slide = ctx.createBufferSource();
+  slide.buffer = noiseBuffer(2);
+  slide.loop = true;
+  const slideBp = ctx.createBiquadFilter();
+  slideBp.type = "bandpass";
+  slideBp.frequency.value = 1500;
+  slideBp.Q.value = 0.7;
+  const slideGain = ctx.createGain();
+  slideGain.gain.value = 0.5;
+  slide.connect(slideBp).connect(slideGain).connect(hp);
 
-  const noise = ctx.createBufferSource();
-  noise.buffer = noiseBuffer(2);
-  noise.loop = true;
-  const nFilter = ctx.createBiquadFilter();
-  nFilter.type = "bandpass";
-  nFilter.frequency.value = 400;
-  nFilter.Q.value = 0.8;
-  const nGain = ctx.createGain();
-  nGain.gain.value = 0.25;
-  noise.connect(nFilter).connect(nGain).connect(lp);
+  const body = ctx.createBufferSource();
+  body.buffer = noiseBuffer(2);
+  body.loop = true;
+  const bodyBp = ctx.createBiquadFilter();
+  bodyBp.type = "bandpass";
+  bodyBp.frequency.value = 480;
+  bodyBp.Q.value = 0.9;
+  const bodyGain = ctx.createGain();
+  bodyGain.gain.value = 0.28;
+  body.connect(bodyBp).connect(bodyGain).connect(hp);
 
-  for (const node of [osc1, osc2, lfo, noise]) {
+  const rattle = ctx.createOscillator();
+  rattle.frequency.value = 26;
+  const rattleGain = ctx.createGain();
+  rattleGain.gain.value = 0.16;
+  rattle.connect(rattleGain).connect(slideGain.gain);
+
+  const surge = ctx.createOscillator();
+  surge.frequency.value = 2.8;
+  const surgeGain = ctx.createGain();
+  surgeGain.gain.value = 0.1;
+  surge.connect(surgeGain).connect(slideGain.gain);
+
+  for (const node of [osc1, osc2, slide, body, rattle, surge]) {
     node.start(t);
     stops.push(() => node.stop());
   }
@@ -227,7 +245,7 @@ export function startExteriorAmbience() {
 
   exteriorGain = ctx.createGain();
   exteriorGain.gain.setValueAtTime(0.0001, t);
-  exteriorGain.gain.exponentialRampToValueAtTime(0.045, t + 1.5);
+  exteriorGain.gain.exponentialRampToValueAtTime(0.035, t + 1.5);
   exteriorGain.connect(master);
 
   const noise = ctx.createBufferSource();
@@ -235,8 +253,11 @@ export function startExteriorAmbience() {
   noise.loop = true;
   const lp = ctx.createBiquadFilter();
   lp.type = "lowpass";
-  lp.frequency.value = 140;
-  noise.connect(lp).connect(exteriorGain);
+  lp.frequency.value = 320;
+  const hp = ctx.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = 90;
+  noise.connect(hp).connect(lp).connect(exteriorGain);
 
   const lfo = ctx.createOscillator();
   lfo.frequency.value = 0.15;

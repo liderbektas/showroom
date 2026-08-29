@@ -14,6 +14,7 @@ import {
   playChainTick,
   startExteriorAmbience,
   crossfadeToInterior,
+  playSpotClack,
 } from "@/lib/audio";
 
 const DOOR_W = 4.6;
@@ -310,6 +311,8 @@ function makeFoliageAlpha() {
 
 function Facade() {
   const wallMaps = useMemo(makeWallMaps, []);
+  const phase = useIntroStore((s) => s.phase);
+  const lit = phase === "opening" || phase === "inside";
   const wallGeo = useMemo(() => {
     const shape = new THREE.Shape();
     shape.moveTo(-WALL_W / 2, 0);
@@ -416,8 +419,14 @@ function Facade() {
         </mesh>
         <mesh position={[0, -0.015, 0.072]}>
           <boxGeometry args={[0.35, 0.07, 0.004]} />
-          <meshStandardMaterial color="#dfe4e8" roughness={0.3} emissive="#b9c2c9" emissiveIntensity={0.15} />
+          <meshStandardMaterial
+            color="#dfe4e8"
+            roughness={0.3}
+            emissive={lit ? "#ffe9c4" : "#b9c2c9"}
+            emissiveIntensity={lit ? 2.4 : 0.15}
+          />
         </mesh>
+        {lit && <pointLight position={[0, -0.25, 0.5]} intensity={1.4} distance={3.2} color="#ffe6bd" />}
       </group>
 
       <mesh position={[-3.75, WALL_H / 2, 0.09]} castShadow>
@@ -705,6 +714,7 @@ function Sequence({
     let lastTick = 0;
     const tl = gsap.timeline({ onComplete: () => setPhase("inside") });
     tl.call(playRelay, undefined, 0.05)
+      .call(playSpotClack, undefined, 0.32)
       .call(startMotor, undefined, 0.55)
       .to(progress.current, {
         p: 1,
@@ -779,6 +789,171 @@ function Grain() {
       className="pointer-events-none absolute inset-0 opacity-[0.08] mix-blend-overlay"
       style={{ backgroundRepeat: "repeat" }}
     />
+  );
+}
+
+function makeKeypadMap() {
+  const W = 128;
+  const H = 192;
+  const cv = document.createElement("canvas");
+  cv.width = W;
+  cv.height = H;
+  const ctx = cv.getContext("2d")!;
+  ctx.fillStyle = "#33363b";
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#181a1d";
+  ctx.fillRect(18, 16, W - 36, 30);
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 3; c++) {
+      const x = 30 + c * 34;
+      const y = 70 + r * 30;
+      const g = ctx.createRadialGradient(x - 2, y - 2, 1, x, y, 10);
+      g.addColorStop(0, "#8d9298");
+      g.addColorStop(1, "#4c5156");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, 9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+function makeVentMap() {
+  const W = 256;
+  const H = 176;
+  const cv = document.createElement("canvas");
+  cv.width = W;
+  cv.height = H;
+  const ctx = cv.getContext("2d")!;
+  ctx.fillStyle = "#7e7a70";
+  ctx.fillRect(0, 0, W, H);
+  for (let y = 14; y < H - 8; y += 18) {
+    ctx.fillStyle = "#15161a";
+    ctx.fillRect(10, y, W - 20, 9);
+    ctx.fillStyle = "#a8a49a";
+    ctx.fillRect(10, y + 9, W - 20, 3);
+  }
+  ctx.strokeStyle = "#5d594f";
+  ctx.lineWidth = 8;
+  ctx.strokeRect(4, 4, W - 8, H - 8);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+function makeDustMap() {
+  const S = 64;
+  const cv = document.createElement("canvas");
+  cv.width = S;
+  cv.height = S;
+  const ctx = cv.getContext("2d")!;
+  const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0, "rgba(255,255,255,0.9)");
+  g.addColorStop(0.4, "rgba(255,255,255,0.25)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  return new THREE.CanvasTexture(cv);
+}
+
+function Details() {
+  const keypad = useMemo(makeKeypadMap, []);
+  const vent = useMemo(makeVentMap, []);
+
+  return (
+    <group>
+      {[-1, 1].map((s) => (
+        <group key={s} position={[s * (DOOR_W / 2 - 0.1), 0.16, -0.16]}>
+          <mesh castShadow>
+            <boxGeometry args={[0.06, 0.09, 0.06]} />
+            <meshStandardMaterial color="#2a2d31" metalness={0.5} roughness={0.5} />
+          </mesh>
+          <mesh position={[0, 0.012, 0.031]}>
+            <circleGeometry args={[0.011, 12]} />
+            <meshStandardMaterial color="#3a0c08" emissive="#ff2a1a" emissiveIntensity={2.2} />
+          </mesh>
+        </group>
+      ))}
+
+      <group position={[2.62, 1.24, 0.028]}>
+        <mesh castShadow>
+          <boxGeometry args={[0.13, 0.19, 0.05]} />
+          <meshStandardMaterial color="#2c2f33" metalness={0.5} roughness={0.5} />
+        </mesh>
+        <mesh position-z={0.026}>
+          <planeGeometry args={[0.12, 0.18]} />
+          <meshStandardMaterial map={keypad} roughness={0.55} metalness={0.3} />
+        </mesh>
+      </group>
+
+      <mesh position={[0, DOOR_H + 2.45, 0.032]} castShadow>
+        <cylinderGeometry args={[0.017, 0.017, 2.6, 10]} />
+        <meshStandardMaterial color="#9b978c" metalness={0.4} roughness={0.6} />
+      </mesh>
+      <mesh position={[0, DOOR_H + 1.14, 0.04]} castShadow>
+        <boxGeometry args={[0.11, 0.11, 0.07]} />
+        <meshStandardMaterial color="#8e8a80" metalness={0.4} roughness={0.6} />
+      </mesh>
+
+      <group position={[-2.2, 3.82, 0.022]}>
+        <mesh castShadow>
+          <boxGeometry args={[0.54, 0.38, 0.045]} />
+          <meshStandardMaterial color="#87837a" metalness={0.35} roughness={0.7} />
+        </mesh>
+        <mesh position-z={0.024}>
+          <planeGeometry args={[0.5, 0.34]} />
+          <meshStandardMaterial map={vent} metalness={0.4} roughness={0.6} />
+        </mesh>
+      </group>
+
+    </group>
+  );
+}
+
+const DUST_COUNT = 160;
+
+function Dust({ progress }: { progress: React.RefObject<{ p: number }> }) {
+  const map = useMemo(makeDustMap, []);
+  const mat = useRef<THREE.PointsMaterial>(null);
+  const pts = useRef<THREE.Points>(null);
+  const positions = useMemo(() => {
+    const arr = new Float32Array(DUST_COUNT * 3);
+    for (let i = 0; i < DUST_COUNT; i++) {
+      arr[i * 3] = (Math.random() - 0.5) * 4.2;
+      arr[i * 3 + 1] = Math.random() * 2.4;
+      arr[i * 3 + 2] = -1.6 + Math.random() * 2.4;
+    }
+    return arr;
+  }, []);
+
+  useFrame(({ clock }) => {
+    if (!mat.current || !pts.current) return;
+    const t = clock.elapsedTime;
+    mat.current.opacity = Math.min(Math.max(progress.current.p - 0.12, 0) * 1.6, 0.4);
+    pts.current.position.x = Math.sin(t * 0.06) * 0.12;
+    pts.current.position.y = 0.15 + Math.sin(t * 0.045) * 0.08;
+    pts.current.rotation.y = t * 0.016;
+  });
+
+  return (
+    <points ref={pts} position={[0, 0.15, -0.3]}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        ref={mat}
+        map={map}
+        color="#ffeeda"
+        size={0.028}
+        transparent
+        opacity={0}
+        depthWrite={false}
+        sizeAttenuation
+      />
+    </points>
   );
 }
 
@@ -867,87 +1042,65 @@ function WallSign() {
   );
 }
 
-function makeEnterSignMap() {
-  const W = 576;
+function makeGroundSignMap() {
+  const W = 384;
   const H = 768;
   const cv = document.createElement("canvas");
   cv.width = W;
   cv.height = H;
   const ctx = cv.getContext("2d")!;
-  const INK = "#e9e4d2";
-  const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+  const PAINT = "#ddd6c2";
+  const ls = ctx as unknown as { letterSpacing: string };
 
-  const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, "#375741");
-  bg.addColorStop(0.6, "#30503a");
-  bg.addColorStop(1, "#28422f");
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = PAINT;
+  ctx.lineWidth = 34;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(W / 2, 300);
+  ctx.lineTo(W / 2, 60);
+  ctx.moveTo(W / 2 - 62, 130);
+  ctx.lineTo(W / 2, 42);
+  ctx.lineTo(W / 2 + 62, 130);
+  ctx.stroke();
 
-  for (let i = 0; i < 22; i++) {
+  ctx.fillStyle = PAINT;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.save();
+  ctx.translate(W / 2, 430);
+  ctx.scale(1, 2);
+  ls.letterSpacing = "5px";
+  ctx.font = "700 62px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+  ctx.fillText("ENTER", 2, 0);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(W / 2, 540);
+  ctx.scale(1, 1.9);
+  ls.letterSpacing = "8px";
+  ctx.font = "700 30px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+  ctx.fillText("CLICK TO OPEN", 4, 0);
+  ctx.restore();
+
+  ctx.globalCompositeOperation = "destination-out";
+  for (let i = 0; i < 2600; i++) {
     const x = Math.random() * W;
     const y = Math.random() * H;
-    const r = 35 + Math.random() * 110;
+    ctx.fillStyle = `rgba(0,0,0,${0.25 + Math.random() * 0.55})`;
+    ctx.fillRect(x, y, 1 + Math.random() * 3, 1 + Math.random() * 2);
+  }
+  for (let i = 0; i < 14; i++) {
+    const x = Math.random() * W;
+    const y = Math.random() * H;
+    const r = 12 + Math.random() * 30;
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, `rgba(10,24,14,${0.04 + Math.random() * 0.05})`);
+    g.addColorStop(0, "rgba(0,0,0,0.5)");
     g.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = g;
     ctx.fillRect(x - r, y - r, r * 2, r * 2);
   }
-  signNoise(ctx, W, H, 1200);
-
-  const vig = ctx.createLinearGradient(0, H - 70, 0, H);
-  vig.addColorStop(0, "rgba(8,18,10,0)");
-  vig.addColorStop(1, "rgba(8,18,10,0.2)");
-  ctx.fillStyle = vig;
-  ctx.fillRect(0, H - 70, W, 70);
-
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 4;
-  ctx.strokeRect(28, 28, W - 56, H - 56);
-
-  const ls = ctx as unknown as { letterSpacing: string };
-  ctx.fillStyle = INK;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  ls.letterSpacing = "4px";
-  ctx.font = `900 96px ${SANS}`;
-  ctx.fillText("ENTER", W / 2 + 2, 240);
-
-  ls.letterSpacing = "11px";
-  ctx.font = `700 36px ${SANS}`;
-  ctx.fillText("THE GARAGE", W / 2 + 5, 326);
-
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 14;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  const ay = 470;
-  ctx.beginPath();
-  ctx.moveTo(W / 2 + 52, ay);
-  ctx.lineTo(W / 2 - 52, ay);
-  ctx.moveTo(W / 2 - 20, ay - 30);
-  ctx.lineTo(W / 2 - 52, ay);
-  ctx.lineTo(W / 2 - 20, ay + 30);
-  ctx.stroke();
-
-  ls.letterSpacing = "8px";
-  ctx.font = `600 22px ${SANS}`;
-  ctx.fillStyle = "rgba(233,228,210,0.6)";
-  ctx.fillText("CLICK TO OPEN", W / 2 + 4, 654);
-
-  for (let i = 0; i < 1400; i++) {
-    const x = Math.random() * W;
-    const y = Math.random() * H;
-    ctx.fillStyle = `rgba(48,80,58,${0.05 + Math.random() * 0.1})`;
-    ctx.fillRect(x, y, 1 + Math.random(), 1 + Math.random());
-  }
-
-  drawScrew(ctx, 46, 46, 11);
-  drawScrew(ctx, W - 46, 46, 11);
-  drawScrew(ctx, 46, H - 46, 11);
-  drawScrew(ctx, W - 46, H - 46, 11);
+  ctx.globalCompositeOperation = "source-over";
 
   const t = new THREE.CanvasTexture(cv);
   t.anisotropy = 8;
@@ -955,8 +1108,8 @@ function makeEnterSignMap() {
   return t;
 }
 
-function EnterSign({ onEnter }: { onEnter: () => void }) {
-  const map = useMemo(makeEnterSignMap, []);
+function GroundSign({ onEnter }: { onEnter: () => void }) {
+  const map = useMemo(makeGroundSignMap, []);
   const [hover, setHover] = useState(false);
   const phase = useIntroStore((s) => s.phase);
   const idle = phase === "loading" || phase === "ready";
@@ -969,8 +1122,9 @@ function EnterSign({ onEnter }: { onEnter: () => void }) {
   }, [hover, idle]);
 
   return (
-    <group
-      position={[3.35, 1.5, 0.035]}
+    <mesh
+      position={[0, 0.006, 2.45]}
+      rotation-x={-Math.PI / 2}
       onClick={(e) => {
         e.stopPropagation();
         onEnter();
@@ -978,15 +1132,15 @@ function EnterSign({ onEnter }: { onEnter: () => void }) {
       onPointerOver={() => setHover(true)}
       onPointerOut={() => setHover(false)}
     >
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={[0.56, 0.76, 0.025]} />
-        <meshStandardMaterial color="#243c2b" metalness={0.3} roughness={0.6} />
-      </mesh>
-      <mesh position-z={0.0135}>
-        <planeGeometry args={[0.56, 0.76]} />
-        <meshStandardMaterial map={map} color={hover && idle ? "#ffffff" : "#e3e3e3"} roughness={0.55} />
-      </mesh>
-    </group>
+      <planeGeometry args={[1.55, 2.6]} />
+      <meshStandardMaterial
+        map={map}
+        transparent
+        color={hover && idle ? "#ffffff" : "#dcdcdc"}
+        roughness={0.9}
+        depthWrite={false}
+      />
+    </mesh>
   );
 }
 
@@ -1016,7 +1170,9 @@ export default function GarageDoor() {
         <Interior />
         <Door progress={progress} />
         <WallSign />
-        <EnterSign onEnter={enter} />
+        <GroundSign onEnter={enter} />
+        <Details />
+        <Dust progress={progress} />
         <directionalLight
           position={[6, 9, 7]}
           intensity={2.3}
