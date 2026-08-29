@@ -117,177 +117,51 @@ function makeWallMaps() {
   return { map: toTex(color, true), normalMap: toTex(normal) };
 }
 
-function makeDoorMaps() {
-  const W = 2048;
-  const H = 2048;
-  const slatH = H / SLATS;
-  const RIBS = SLATS * 4;
-  const ribH = H / RIBS;
+const SLAT_GAP = 0.014;
+const SLAT_D = 0.06;
 
-  const color = document.createElement("canvas");
-  color.width = W;
-  color.height = H;
-  const c = color.getContext("2d")!;
-  c.fillStyle = "#43484e";
-  c.fillRect(0, 0, W, H);
+function makeSlatGeometry() {
+  const h = SLAT_H - SLAT_GAP;
+  const hh = h / 2;
+  const hd = SLAT_D / 2;
+  const r = 0.018;
+  const shape = new THREE.Shape();
+  shape.moveTo(-hd, -hh + r);
+  shape.lineTo(-hd, hh - r);
+  shape.quadraticCurveTo(-hd, hh, -hd + r, hh);
+  shape.lineTo(hd - r, hh);
+  shape.quadraticCurveTo(hd, hh, hd, hh - r);
+  shape.lineTo(hd, -hh + r);
+  shape.quadraticCurveTo(hd, -hh, hd - r, -hh);
+  shape.lineTo(-hd + r, -hh);
+  shape.quadraticCurveTo(-hd, -hh, -hd, -hh + r);
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: DOOR_W, bevelEnabled: false, curveSegments: 6 });
+  geo.translate(0, 0, -DOOR_W / 2);
+  geo.rotateY(Math.PI / 2);
+  return geo;
+}
 
-  const normal = document.createElement("canvas");
-  normal.width = W;
-  normal.height = H;
-  const n = normal.getContext("2d")!;
-  n.fillStyle = "rgb(128,128,255)";
-  n.fillRect(0, 0, W, H);
-
-  const rough = document.createElement("canvas");
-  rough.width = W;
-  rough.height = H;
-  const r = rough.getContext("2d")!;
-  r.fillStyle = "#8d8d8d";
-  r.fillRect(0, 0, W, H);
-
-  for (let i = 0; i < 55; i++) {
-    const x = Math.random() * W;
-    const y = Math.random() * H;
-    const rad = 140 + Math.random() * 380;
-    const light = Math.random() > 0.5;
-    const g = c.createRadialGradient(x, y, 0, x, y, rad);
-    g.addColorStop(0, `rgba(${light ? "255,255,255" : "8,12,18"},${0.01 + Math.random() * 0.02})`);
-    g.addColorStop(1, "rgba(0,0,0,0)");
-    c.fillStyle = g;
-    c.fillRect(x - rad, y - rad, rad * 2, rad * 2);
-
-    const off = Math.round((Math.random() - 0.5) * 8);
-    const ng = n.createRadialGradient(x, y, 0, x, y, rad);
-    ng.addColorStop(0, `rgba(${128 + off},${128 - off},255,0.08)`);
-    ng.addColorStop(1, "rgba(128,128,255,0)");
-    n.fillStyle = ng;
-    n.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+function makeOrangePeelNormal() {
+  const S = 256;
+  const cv = document.createElement("canvas");
+  cv.width = S;
+  cv.height = S;
+  const ctx = cv.getContext("2d")!;
+  ctx.fillStyle = "rgb(128,128,255)";
+  ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 4200; i++) {
+    const ox = Math.round((Math.random() - 0.5) * 7);
+    const oy = Math.round((Math.random() - 0.5) * 7);
+    ctx.fillStyle = `rgba(${128 + ox},${128 + oy},255,${0.25 + Math.random() * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(Math.random() * S, Math.random() * S, 0.6 + Math.random() * 1.6, 0, Math.PI * 2);
+    ctx.fill();
   }
-
-  for (let i = 0; i < 260; i++) {
-    const x = Math.random() * W;
-    const w = 1 + Math.random() * 3;
-    const light = Math.random() > 0.5;
-    c.fillStyle = `rgba(${light ? "255,255,255" : "0,0,0"},${0.008 + Math.random() * 0.018})`;
-    c.fillRect(x, 0, w, H);
-    r.fillStyle = `rgba(${light ? "95,95,95" : "160,160,160"},0.05)`;
-    r.fillRect(x, 0, w, H);
-  }
-
-  for (let i = 0; i < RIBS; i++) {
-    const y = i * ribH;
-    const g = c.createLinearGradient(0, y, 0, y + ribH);
-    g.addColorStop(0, "rgba(255,255,255,0.13)");
-    g.addColorStop(0.42, "rgba(255,255,255,0.02)");
-    g.addColorStop(0.78, "rgba(0,0,0,0.06)");
-    g.addColorStop(1, "rgba(0,0,0,0.20)");
-    c.fillStyle = g;
-    c.fillRect(0, y, W, ribH);
-    c.fillStyle = "rgba(5,7,9,0.5)";
-    c.fillRect(0, y + ribH - 2, W, 2);
-    c.fillStyle = "rgba(255,255,255,0.10)";
-    c.fillRect(0, y, W, 1);
-
-    const ng = n.createLinearGradient(0, y, 0, y + ribH);
-    ng.addColorStop(0, "rgb(128,168,255)");
-    ng.addColorStop(0.5, "rgb(128,128,255)");
-    ng.addColorStop(1, "rgb(128,88,255)");
-    n.fillStyle = ng;
-    n.fillRect(0, y, W, ribH);
-    n.fillStyle = "rgb(128,108,252)";
-    n.fillRect(0, y + ribH - 2, W, 2);
-  }
-
-  for (let i = 1; i < SLATS; i++) {
-    const y = i * slatH;
-    c.fillStyle = "rgba(0,0,0,0.26)";
-    c.fillRect(0, y - 1, W, 3);
-    n.fillStyle = "rgb(128,100,250)";
-    n.fillRect(0, y - 2, W, 2);
-    n.fillStyle = "rgb(128,156,250)";
-    n.fillRect(0, y, W, 2);
-  }
-
-  for (let i = 0; i < 50; i++) {
-    const x = Math.random() * W;
-    const y = Math.random() * H * 0.8;
-    const len = 120 + Math.random() * 460;
-    const w = 2 + Math.random() * 3;
-    const dark = Math.random() > 0.35;
-    const g = c.createLinearGradient(0, y, 0, y + len);
-    g.addColorStop(0, `rgba(${dark ? "12,15,19" : "220,226,232"},${0.015 + Math.random() * 0.03})`);
-    g.addColorStop(1, "rgba(0,0,0,0)");
-    c.fillStyle = g;
-    c.fillRect(x, y, w, len);
-    r.fillStyle = `rgba(${dark ? "170,170,170" : "100,100,100"},0.1)`;
-    r.fillRect(x, y, w, len * 0.7);
-  }
-
-  for (let i = 0; i < 45; i++) {
-    const x = Math.random() * W;
-    const y = H * 0.35 + Math.random() * H * 0.65;
-    const rad = 1 + Math.random() * 2.5;
-    c.fillStyle = `rgba(0,0,0,${0.1 + Math.random() * 0.18})`;
-    c.beginPath();
-    c.arc(x, y, rad + 1, 0, Math.PI * 2);
-    c.fill();
-    c.fillStyle = `rgba(185,190,196,${0.2 + Math.random() * 0.25})`;
-    c.beginPath();
-    c.arc(x - 0.5, y - 0.5, rad * 0.6, 0, Math.PI * 2);
-    c.fill();
-    r.fillStyle = "rgba(70,70,70,0.4)";
-    r.fillRect(x - rad, y - rad, rad * 2, rad * 2);
-  }
-
-  for (let i = 0; i < 4000; i++) {
-    const x = Math.random() * W;
-    const y = Math.random() * H;
-    const l = Math.random() > 0.5;
-    c.fillStyle = `rgba(${l ? "255,255,255" : "0,0,0"},${0.008 + Math.random() * 0.015})`;
-    c.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
-    r.fillStyle = `rgba(${l ? "200,200,200" : "90,90,90"},0.08)`;
-    r.fillRect(x, y, 2, 2);
-  }
-
-  const railH = 72;
-  c.fillStyle = "#3a3f45";
-  c.fillRect(0, H - railH, W, railH);
-  const railG = c.createLinearGradient(0, H - railH, 0, H);
-  railG.addColorStop(0, "rgba(255,255,255,0.07)");
-  railG.addColorStop(1, "rgba(0,0,0,0.28)");
-  c.fillStyle = railG;
-  c.fillRect(0, H - railH, W, railH);
-  c.fillStyle = "#17191c";
-  c.fillRect(0, H - 26, W, 26);
-  n.fillStyle = "rgb(128,128,255)";
-  n.fillRect(0, H - railH, W, railH);
-  r.fillStyle = "#9c9c9c";
-  r.fillRect(0, H - 26, W, 26);
-
-  const dirt = c.createLinearGradient(0, H * 0.92, 0, H);
-  dirt.addColorStop(0, "rgba(46,40,30,0)");
-  dirt.addColorStop(1, "rgba(46,40,30,0.22)");
-  c.fillStyle = dirt;
-  c.fillRect(0, H * 0.92, W, H * 0.08);
-
-  const aoL = c.createLinearGradient(0, 0, W * 0.03, 0);
-  aoL.addColorStop(0, "rgba(0,0,0,0.22)");
-  aoL.addColorStop(1, "rgba(0,0,0,0)");
-  c.fillStyle = aoL;
-  c.fillRect(0, 0, W * 0.03, H);
-  const aoR = c.createLinearGradient(W * 0.97, 0, W, 0);
-  aoR.addColorStop(0, "rgba(0,0,0,0)");
-  aoR.addColorStop(1, "rgba(0,0,0,0.22)");
-  c.fillStyle = aoR;
-  c.fillRect(W * 0.97, 0, W * 0.03, H);
-
-  const toTex = (cv: HTMLCanvasElement, srgb = false) => {
-    const t = new THREE.CanvasTexture(cv);
-    t.anisotropy = 8;
-    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  };
-  return { map: toTex(color, true), normalMap: toTex(normal), roughnessMap: toTex(rough) };
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 3);
+  return t;
 }
 
 function makeFoliageAlpha() {
@@ -597,46 +471,28 @@ function Interior() {
 }
 
 function Door({ progress }: { progress: React.RefObject<{ p: number }> }) {
-  const maps = useMemo(makeDoorMaps, []);
-  const slats = useRef<(THREE.Mesh | null)[]>([]);
-
-  const slatMaps = useMemo(
-    () =>
-      Array.from({ length: SLATS }, (_, i) => {
-        const slice = (t: THREE.Texture) => {
-          const s = t.clone();
-          s.repeat.set(1, 1 / SLATS);
-          s.offset.set(0, i / SLATS);
-          s.needsUpdate = true;
-          return s;
-        };
-        return {
-          map: slice(maps.map),
-          normalMap: slice(maps.normalMap),
-          roughnessMap: slice(maps.roughnessMap),
-        };
-      }),
-    [maps]
-  );
+  const geo = useMemo(makeSlatGeometry, []);
+  const peel = useMemo(makeOrangePeelNormal, []);
+  const slats = useRef<(THREE.Group | null)[]>([]);
 
   useFrame(() => {
     const lift = progress.current.p * LIFT_MAX;
     for (let i = 0; i < SLATS; i++) {
-      const mesh = slats.current[i];
-      if (!mesh) continue;
+      const g = slats.current[i];
+      if (!g) continue;
       const s = (i + 0.5) * SLAT_H + lift;
       if (s <= DOOR_H) {
-        mesh.position.set(0, s, 0);
-        mesh.rotation.x = 0;
+        g.position.set(0, s, 0);
+        g.rotation.x = 0;
       } else {
         const e = s - DOOR_H;
         if (e < ARC) {
           const th = e / TRACK_R;
-          mesh.position.set(0, DOOR_H + TRACK_R * Math.sin(th), -TRACK_R + TRACK_R * Math.cos(th));
-          mesh.rotation.x = -th;
+          g.position.set(0, DOOR_H + TRACK_R * Math.sin(th), -TRACK_R + TRACK_R * Math.cos(th));
+          g.rotation.x = -th;
         } else {
-          mesh.position.set(0, DOOR_H + TRACK_R, -TRACK_R - (e - ARC));
-          mesh.rotation.x = -Math.PI / 2;
+          g.position.set(0, DOOR_H + TRACK_R, -TRACK_R - (e - ARC));
+          g.rotation.x = -Math.PI / 2;
         }
       }
     }
@@ -644,26 +500,33 @@ function Door({ progress }: { progress: React.RefObject<{ p: number }> }) {
 
   return (
     <group position-z={-RECESS}>
-      {slatMaps.map((m, i) => (
-        <mesh
+      {Array.from({ length: SLATS }, (_, i) => (
+        <group
           key={i}
           ref={(el) => {
             slats.current[i] = el;
           }}
           position={[0, (i + 0.5) * SLAT_H, 0]}
-          receiveShadow
         >
-          <planeGeometry args={[DOOR_W, SLAT_H]} />
-          <meshPhysicalMaterial
-            {...m}
-            color="#ffffff"
-            metalness={0.45}
-            roughness={1}
-            normalScale={new THREE.Vector2(1, 1)}
-            envMapIntensity={0.7}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
+          <mesh geometry={geo} castShadow receiveShadow>
+            <meshPhysicalMaterial
+              color="#3c4249"
+              metalness={0.2}
+              roughness={0.38}
+              clearcoat={0.55}
+              clearcoatRoughness={0.22}
+              envMapIntensity={1.25}
+              normalMap={peel}
+              normalScale={new THREE.Vector2(0.35, 0.35)}
+            />
+          </mesh>
+          {i === 0 && (
+            <mesh position={[0, -SLAT_H / 2 + 0.002, 0]}>
+              <boxGeometry args={[DOOR_W, 0.045, 0.05]} />
+              <meshStandardMaterial color="#101113" roughness={0.9} />
+            </mesh>
+          )}
+        </group>
       ))}
     </group>
   );

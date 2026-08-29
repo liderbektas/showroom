@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Auto Showroom",
+  title: "showroom",
   description: "A cinematic 3D automotive showroom experience",
 };
 
