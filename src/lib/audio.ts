@@ -239,6 +239,40 @@ export function playSpotClack() {
   click({ freq: 900, gain: 0.08, noiseDur: 0.03, highpass: 400, toRoom: true, when: 0.02 });
 }
 
+let birdTimer: ReturnType<typeof setTimeout> | null = null;
+
+function playBirdChirp() {
+  if (!ctx || !master) return;
+  const t = ctx.currentTime;
+  const base = 2300 + Math.random() * 1900;
+  const chirps = 2 + Math.floor(Math.random() * 3);
+  const pan = ctx.createStereoPanner();
+  pan.pan.value = Math.random() * 1.6 - 0.8;
+  pan.connect(master);
+  for (let i = 0; i < chirps; i++) {
+    const start = t + i * (0.1 + Math.random() * 0.08);
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(base * (0.9 + Math.random() * 0.2), start);
+    osc.frequency.exponentialRampToValueAtTime(base * (1.25 + Math.random() * 0.3), start + 0.04);
+    osc.frequency.exponentialRampToValueAtTime(base * 0.85, start + 0.09);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(0.02 + Math.random() * 0.02, start + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + 0.1);
+    osc.connect(g).connect(pan);
+    osc.start(start);
+    osc.stop(start + 0.12);
+  }
+}
+
+function scheduleBirds() {
+  birdTimer = setTimeout(() => {
+    playBirdChirp();
+    scheduleBirds();
+  }, 2000 + Math.random() * 5000);
+}
+
 export function startExteriorAmbience() {
   if (!ctx || !master || exteriorGain) return;
   const t = ctx.currentTime;
@@ -267,12 +301,17 @@ export function startExteriorAmbience() {
 
   noise.start(t);
   lfo.start(t);
+  scheduleBirds();
 }
 
 export function crossfadeToInterior() {
   if (!ctx || !master) return;
   const t = ctx.currentTime;
 
+  if (birdTimer) {
+    clearTimeout(birdTimer);
+    birdTimer = null;
+  }
   if (exteriorGain) {
     exteriorGain.gain.cancelScheduledValues(t);
     exteriorGain.gain.setValueAtTime(Math.max(exteriorGain.gain.value, 0.0001), t);

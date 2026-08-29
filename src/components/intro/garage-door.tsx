@@ -982,8 +982,14 @@ function drawScrew(ctx: CanvasRenderingContext2D, x: number, y: number, r: numbe
   ctx.stroke();
 }
 
+const VOLUME_ICON_PATHS = [
+  "M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z",
+  "M16 9a5 5 0 0 1 0 6",
+  "M19.364 18.364a9 9 0 0 0 0-12.728",
+];
+
 function makeWallSignMap() {
-  const W = 1536;
+  const W = 1792;
   const H = 384;
   const cv = document.createElement("canvas");
   cv.width = W;
@@ -1001,13 +1007,23 @@ function makeWallSignMap() {
   ctx.lineWidth = 8;
   ctx.strokeRect(26, 26, W - 52, H - 52);
 
+  ctx.save();
+  ctx.translate(96, H / 2 - 66);
+  ctx.scale(5.5, 5.5);
+  ctx.strokeStyle = "#2b2e33";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  for (const d of VOLUME_ICON_PATHS) ctx.stroke(new Path2D(d));
+  ctx.restore();
+
   (ctx as unknown as { letterSpacing: string }).letterSpacing = "12px";
   ctx.fillStyle = "#2b2e33";
-  ctx.textAlign = "center";
+  ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.font = "600 66px 'Helvetica Neue', Helvetica, Arial, sans-serif";
-  ctx.fillText("FOR THE BEST EXPERIENCE", W / 2 + 6, H * 0.37);
-  ctx.fillText("PLEASE TURN ON YOUR SOUND", W / 2 + 6, H * 0.66);
+  ctx.fillText("FOR THE BEST EXPERIENCE", 280, H * 0.37);
+  ctx.fillText("PLEASE TURN ON YOUR SOUND", 280, H * 0.66);
 
   drawScrew(ctx, 52, 52, 13);
   drawScrew(ctx, W - 52, 52, 13);
@@ -1031,11 +1047,11 @@ function WallSign() {
   return (
     <group position={[0, DOOR_H + 0.52, 0.045]}>
       <mesh castShadow receiveShadow>
-        <boxGeometry args={[1.7, 0.42, 0.03]} />
+        <boxGeometry args={[1.96, 0.42, 0.03]} />
         <meshStandardMaterial color="#d6d2c6" roughness={0.7} metalness={0.15} />
       </mesh>
       <mesh position-z={0.0155} receiveShadow>
-        <planeGeometry args={[1.7, 0.42]} />
+        <planeGeometry args={[1.96, 0.42]} />
         <meshStandardMaterial map={map} roughness={0.55} metalness={0.05} />
       </mesh>
     </group>
@@ -1152,6 +1168,21 @@ export default function GarageDoor() {
   const progress = useRef({ p: 0 });
   const rig = useRef({ z: 8.2, parallax: 1 });
   const fade = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Tarayıcı autoplay kısıtı: ses ancak bir kullanıcı hareketinden sonra başlatılabilir.
+    const wake = () => {
+      initAudio();
+      startExteriorAmbience();
+    };
+    window.addEventListener("pointerdown", wake, { once: true });
+    window.addEventListener("keydown", wake, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", wake);
+      window.removeEventListener("keydown", wake);
+    };
+  }, []);
+
   const enter = () => {
     if (!idle) return;
     initAudio();
