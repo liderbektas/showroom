@@ -398,98 +398,171 @@ function FoliageShadow() {
   );
 }
 
-function makeGroundMap() {
-  const S = 1024;
-  const GROUND_D = 12.45;
-  const cv = document.createElement("canvas");
-  cv.width = S;
-  cv.height = S;
-  const ctx = cv.getContext("2d")!;
-  ctx.fillStyle = "#9c9a94";
-  ctx.fillRect(0, 0, S, S);
+function makeAsphaltMaps() {
+  const S = 2048;
+
+  const color = document.createElement("canvas");
+  color.width = S;
+  color.height = S;
+  const c = color.getContext("2d")!;
+  c.fillStyle = "#3c3d40";
+  c.fillRect(0, 0, S, S);
+
+  const normal = document.createElement("canvas");
+  normal.width = S;
+  normal.height = S;
+  const n = normal.getContext("2d")!;
+  n.fillStyle = "rgb(128,128,255)";
+  n.fillRect(0, 0, S, S);
+
+  const rough = document.createElement("canvas");
+  rough.width = S;
+  rough.height = S;
+  const r = rough.getContext("2d")!;
+  r.fillStyle = "#a8a8a8";
+  r.fillRect(0, 0, S, S);
 
   for (let i = 0; i < 70; i++) {
     const x = Math.random() * S;
     const y = Math.random() * S;
-    const rad = 40 + Math.random() * 170;
+    const rad = 60 + Math.random() * 220;
     const light = Math.random() > 0.5;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
-    g.addColorStop(0, `rgba(${light ? "255,255,255" : "40,36,28"},${0.02 + Math.random() * 0.04})`);
+    const g = c.createRadialGradient(x, y, 0, x, y, rad);
+    g.addColorStop(0, `rgba(${light ? "255,255,255" : "10,10,12"},${0.02 + Math.random() * 0.04})`);
     g.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    c.fillStyle = g;
+    c.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    const rg = r.createRadialGradient(x, y, 0, x, y, rad);
+    rg.addColorStop(0, `rgba(${light ? "150,150,150" : "90,90,90"},0.12)`);
+    rg.addColorStop(1, "rgba(0,0,0,0)");
+    r.fillStyle = rg;
+    r.fillRect(x - rad, y - rad, rad * 2, rad * 2);
   }
 
-  const stepX = (2.5 / WALL_W) * S;
-  for (let x = stepX; x < S; x += stepX) {
-    ctx.fillStyle = "rgba(30,28,24,0.20)";
-    ctx.fillRect(x, 0, 2, S);
-    ctx.fillStyle = "rgba(255,255,255,0.07)";
-    ctx.fillRect(x + 2, 0, 1, S);
-  }
-  for (const wz of [2, 5, 8, 11]) {
-    const y = ((wz + 0.445) / GROUND_D) * S;
-    ctx.fillStyle = "rgba(30,28,24,0.20)";
-    ctx.fillRect(0, y, S, 2);
-    ctx.fillStyle = "rgba(255,255,255,0.07)";
-    ctx.fillRect(0, y + 2, S, 1);
+  for (let i = 0; i < 2; i++) {
+    const x = S * 0.1 + Math.random() * S * 0.7;
+    const y = S * 0.35 + Math.random() * S * 0.5;
+    const w = 180 + Math.random() * 280;
+    const h = 130 + Math.random() * 220;
+    c.fillStyle = "rgba(16,16,18,0.15)";
+    c.fillRect(x, y, w, h);
+    c.strokeStyle = "rgba(8,8,10,0.35)";
+    c.lineWidth = 6;
+    c.strokeRect(x, y, w, h);
+    r.fillStyle = "rgba(88,88,88,0.28)";
+    r.fillRect(x, y, w, h);
   }
 
-  const contact = ctx.createLinearGradient(0, 0, 0, 80);
-  contact.addColorStop(0, "rgba(20,18,14,0.3)");
-  contact.addColorStop(1, "rgba(20,18,14,0)");
-  ctx.fillStyle = contact;
-  ctx.fillRect(0, 0, S, 80);
+  for (let i = 0; i < 26000; i++) {
+    const x = Math.random() * S;
+    const y = Math.random() * S;
+    const l = Math.random() > 0.45;
+    c.fillStyle = `rgba(${l ? "120,121,125" : "20,20,22"},${0.03 + Math.random() * 0.04})`;
+    c.fillRect(x, y, 1, 1);
+    const off = Math.round((Math.random() - 0.5) * 14);
+    n.fillStyle = `rgba(${128 + off},${128 - off},255,0.13)`;
+    n.fillRect(x, y, 1, 1);
+    r.fillStyle = Math.random() > 0.5 ? "rgba(165,165,165,0.10)" : "rgba(82,82,82,0.10)";
+    r.fillRect(x, y, 1, 1);
+  }
 
   for (const side of [-1, 1]) {
     const cx = S / 2 + side * (0.85 / WALL_W) * S;
-    const trackW = (0.36 / WALL_W) * S;
-    for (let y = 10; y < S * 0.66; y += 6) {
-      const fade = 1 - y / (S * 0.66);
-      const wob = Math.sin(y * 0.015 + side) * 2.5;
-      ctx.fillStyle = `rgba(34,30,24,${0.085 * fade + Math.random() * 0.02})`;
-      ctx.fillRect(cx + wob - trackW / 2, y, trackW, 7);
-      ctx.fillStyle = `rgba(34,30,24,${0.04 * fade})`;
-      ctx.fillRect(cx + wob - trackW / 2 - 3, y, 3, 7);
-      ctx.fillRect(cx + wob + trackW / 2, y, 3, 7);
+    const tw = (0.3 / WALL_W) * S;
+    for (let y = 8; y < S * 0.5; y += 5) {
+      const fade = 1 - y / (S * 0.5);
+      const wob = Math.sin(y * 0.012 + side) * 3;
+      c.fillStyle = `rgba(10,10,12,${0.1 * fade + Math.random() * 0.02})`;
+      c.fillRect(cx + wob - tw / 2, y, tw, 6);
     }
   }
 
-  for (let i = 0; i < 10; i++) {
-    const x = S / 2 + (Math.random() - 0.5) * (3.5 / WALL_W) * S * 2;
-    const y = 30 + Math.random() * 220;
-    const rad = 12 + Math.random() * 42;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
-    g.addColorStop(0, `rgba(28,24,18,${0.08 + Math.random() * 0.1})`);
-    g.addColorStop(0.7, `rgba(28,24,18,${0.03 + Math.random() * 0.04})`);
+  for (let i = 0; i < 6; i++) {
+    const x = S / 2 + (Math.random() - 0.5) * (4 / WALL_W) * S;
+    const y = 60 + Math.random() * S * 0.22;
+    const rad = 18 + Math.random() * 55;
+    const g = c.createRadialGradient(x, y, 0, x, y, rad);
+    g.addColorStop(0, `rgba(14,12,10,${0.18 + Math.random() * 0.15})`);
+    g.addColorStop(0.7, "rgba(14,12,10,0.06)");
     g.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    c.fillStyle = g;
+    c.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    const rg = r.createRadialGradient(x, y, 0, x, y, rad);
+    rg.addColorStop(0, "rgba(70,70,70,0.5)");
+    rg.addColorStop(1, "rgba(0,0,0,0)");
+    r.fillStyle = rg;
+    r.fillRect(x - rad, y - rad, rad * 2, rad * 2);
   }
 
-  for (let i = 0; i < 3500; i++) {
-    const x = Math.random() * S;
+  const contact = c.createLinearGradient(0, 0, 0, 90);
+  contact.addColorStop(0, "rgba(16,14,12,0.35)");
+  contact.addColorStop(1, "rgba(16,14,12,0)");
+  c.fillStyle = contact;
+  c.fillRect(0, 0, S, 90);
+
+  const toTex = (cv: HTMLCanvasElement, srgb = false) => {
+    const t = new THREE.CanvasTexture(cv);
+    t.anisotropy = 16;
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
+  return { map: toTex(color, true), normalMap: toTex(normal), roughnessMap: toTex(rough) };
+}
+
+function makeApronMap() {
+  const S = 256;
+  const cv = document.createElement("canvas");
+  cv.width = S;
+  cv.height = S;
+  const ctx = cv.getContext("2d")!;
+  ctx.fillStyle = "#a29c90";
+  ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 420; i++) {
     const y = Math.random() * S;
     const l = Math.random() > 0.5;
-    ctx.fillStyle = `rgba(${l ? "255,255,255" : "20,18,14"},${0.01 + Math.random() * 0.03})`;
-    ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+    ctx.fillStyle = `rgba(${l ? "255,255,255" : "60,56,48"},${0.02 + Math.random() * 0.04})`;
+    ctx.fillRect(0, y, S, 1);
   }
-
+  for (let i = 0; i < 900; i++) {
+    const l = Math.random() > 0.5;
+    ctx.fillStyle = `rgba(${l ? "255,255,255" : "50,46,40"},${0.02 + Math.random() * 0.05})`;
+    ctx.fillRect(Math.random() * S, Math.random() * S, 1 + Math.random() * 2, 1 + Math.random() * 2);
+  }
+  ctx.fillStyle = "rgba(40,38,34,0.55)";
+  ctx.fillRect(0, 0, 3, S);
+  ctx.fillStyle = "rgba(255,255,255,0.10)";
+  ctx.fillRect(3, 0, 1, S);
   const t = new THREE.CanvasTexture(cv);
-  t.anisotropy = 8;
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(12, 1);
+  t.anisotropy = 16;
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 
 function Ground() {
-  const map = useMemo(makeGroundMap, []);
+  const maps = useMemo(makeAsphaltMaps, []);
+  const apron = useMemo(makeApronMap, []);
   return (
-    <mesh position={[0, 0, 5.78]} rotation-x={-Math.PI / 2} receiveShadow>
-      <planeGeometry args={[WALL_W, 12.45]} />
-      <meshStandardMaterial map={map} roughness={0.96} />
-    </mesh>
+    <group>
+      <mesh position={[0, 0, 5.78]} rotation-x={-Math.PI / 2} receiveShadow>
+        <planeGeometry args={[WALL_W, 12.45]} />
+        <meshStandardMaterial
+          {...maps}
+          roughness={1}
+          normalScale={new THREE.Vector2(0.6, 0.6)}
+          envMapIntensity={0.55}
+        />
+      </mesh>
+      <mesh position={[0, 0.004, 0.33]} rotation-x={-Math.PI / 2} receiveShadow>
+        <planeGeometry args={[WALL_W, 1.55]} />
+        <meshStandardMaterial map={apron} roughness={0.95} />
+      </mesh>
+    </group>
   );
 }
+
 
 function Interior() {
   return (
