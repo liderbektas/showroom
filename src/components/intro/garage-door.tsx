@@ -541,9 +541,98 @@ function makeApronMap() {
   return t;
 }
 
+const LANE_HALF = 2.5;
+const PAVER = 1.0;
+const PAVER_GAP = 0.012;
+const LANE_Z0 = 1.15;
+const LANE_ROWS = 8;
+
+function makePaverMaps() {
+  const S = 256;
+
+  const color = document.createElement("canvas");
+  color.width = S;
+  color.height = S;
+  const c = color.getContext("2d")!;
+  c.fillStyle = "#6d6a64";
+  c.fillRect(0, 0, S, S);
+
+  const normal = document.createElement("canvas");
+  normal.width = S;
+  normal.height = S;
+  const n = normal.getContext("2d")!;
+  n.fillStyle = "rgb(128,128,255)";
+  n.fillRect(0, 0, S, S);
+
+  for (let i = 0; i < 10; i++) {
+    const x = Math.random() * S;
+    const y = Math.random() * S;
+    const rad = 40 + Math.random() * 90;
+    const light = Math.random() > 0.5;
+    const g = c.createRadialGradient(x, y, 0, x, y, rad);
+    g.addColorStop(0, `rgba(${light ? "255,255,255" : "30,28,24"},${0.02 + Math.random() * 0.04})`);
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    c.fillStyle = g;
+    c.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+  }
+
+  for (let i = 0; i < 1400; i++) {
+    const x = Math.random() * S;
+    const y = Math.random() * S;
+    const l = Math.random() > 0.5;
+    c.fillStyle = `rgba(${l ? "255,255,255" : "34,32,28"},${0.02 + Math.random() * 0.04})`;
+    c.fillRect(x, y, 1, 1);
+    const off = Math.round((Math.random() - 0.5) * 10);
+    n.fillStyle = `rgba(${128 + off},${128 - off},255,0.10)`;
+    n.fillRect(x, y, 1, 1);
+  }
+
+  c.strokeStyle = "rgba(30,28,24,0.20)";
+  c.lineWidth = 6;
+  c.strokeRect(3, 3, S - 6, S - 6);
+  n.strokeStyle = "rgba(128,112,255,0.35)";
+  n.lineWidth = 4;
+  n.strokeRect(2, 2, S - 4, S - 4);
+
+  const toTex = (cv: HTMLCanvasElement, srgb = false) => {
+    const t = new THREE.CanvasTexture(cv);
+    t.anisotropy = 16;
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
+  return { map: toTex(color, true), normalMap: toTex(normal) };
+}
+
 function Ground() {
   const maps = useMemo(makeAsphaltMaps, []);
   const apron = useMemo(makeApronMap, []);
+
+  const paverMats = useMemo(
+    () =>
+      Array.from({ length: 3 }, makePaverMaps).flatMap((m) =>
+        [0.96, 1.03].map((k) => {
+          const mat = new THREE.MeshStandardMaterial({
+            ...m,
+            roughness: 0.88,
+            color: new THREE.Color(k, k, k * 0.995),
+          });
+          mat.normalScale.set(0.5, 0.5);
+          return mat;
+        })
+      ),
+    []
+  );
+
+  const pavers = useMemo(() => {
+    const list: { x: number; z: number }[] = [];
+    for (let ri = 0; ri < LANE_ROWS; ri++) {
+      for (let ci = 0; ci < 5; ci++) {
+        list.push({ x: -LANE_HALF + PAVER / 2 + ci * PAVER, z: LANE_Z0 + PAVER / 2 + ri * PAVER });
+      }
+    }
+    return list;
+  }, []);
+
   return (
     <group>
       <mesh position={[0, 0, 5.78]} rotation-x={-Math.PI / 2} receiveShadow>
@@ -559,6 +648,25 @@ function Ground() {
         <planeGeometry args={[WALL_W, 1.55]} />
         <meshStandardMaterial map={apron} roughness={0.95} />
       </mesh>
+
+      {pavers.map((p, i) => (
+        <mesh
+          key={i}
+          position={[p.x, -0.002, p.z]}
+          material={paverMats[(i * 31 + 5) % paverMats.length]}
+          castShadow
+          receiveShadow
+        >
+          <boxGeometry args={[PAVER - PAVER_GAP, 0.03, PAVER - PAVER_GAP]} />
+        </mesh>
+      ))}
+
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * (LANE_HALF + 0.03), -0.001, LANE_Z0 + (LANE_ROWS * PAVER) / 2]} castShadow receiveShadow>
+          <boxGeometry args={[0.06, 0.036, LANE_ROWS * PAVER]} />
+          <meshStandardMaterial color="#84888d" metalness={0.85} roughness={0.35} envMapIntensity={1.1} />
+        </mesh>
+      ))}
     </group>
   );
 }
@@ -1124,7 +1232,7 @@ function GroundSign({ onEnter }: { onEnter: () => void }) {
 
   return (
     <mesh
-      position={[0, 0.006, 2.45]}
+      position={[0, 0.02, 2.45]}
       rotation-x={-Math.PI / 2}
       onClick={(e) => {
         e.stopPropagation();
@@ -1133,7 +1241,7 @@ function GroundSign({ onEnter }: { onEnter: () => void }) {
       onPointerOver={() => setHover(true)}
       onPointerOut={() => setHover(false)}
     >
-      <planeGeometry args={[1.55, 2.6]} />
+      <planeGeometry args={[1.1, 1.85]} />
       <meshStandardMaterial
         map={map}
         transparent
