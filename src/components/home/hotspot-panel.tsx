@@ -3,6 +3,7 @@
 import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { getVehicle } from "@/data/vehicles";
 import { useShowroomStore } from "@/lib/showroom-store";
+import { playUiTick } from "@/lib/audio";
 
 const DISPLAY = { fontFamily: "var(--font-display), sans-serif" };
 
@@ -17,6 +18,7 @@ export default function HotspotPanel() {
 
   const go = (dir: number) => {
     const next = (index + dir + vehicle.hotspots.length) % vehicle.hotspots.length;
+    playUiTick();
     setHotspot(vehicle.hotspots[next].id);
   };
 
@@ -39,8 +41,11 @@ export default function HotspotPanel() {
               {hotspot.title}
             </h2>
             <button
-              onClick={() => setHotspot(null)}
-              aria-label="Kapat"
+              onClick={() => {
+                playUiTick();
+                setHotspot(null);
+              }}
+              aria-label="Close"
               className="-mr-1 flex size-8 items-center justify-center text-white/40 transition-colors duration-300 hover:text-white"
             >
               <X size={14} strokeWidth={1.6} />
@@ -52,14 +57,14 @@ export default function HotspotPanel() {
           <div className="flex h-12 border-t border-white/10">
             <button
               onClick={() => go(-1)}
-              aria-label="Önceki nokta"
+              aria-label="Previous point"
               className="flex flex-1 items-center justify-center border-r border-white/10 text-white/45 transition-colors duration-300 hover:bg-white/[0.05] hover:text-white"
             >
               <ArrowLeft size={15} strokeWidth={1.6} />
             </button>
             <button
               onClick={() => go(1)}
-              aria-label="Sonraki nokta"
+              aria-label="Next point"
               className="flex flex-1 items-center justify-center text-white/45 transition-colors duration-300 hover:bg-white/[0.05] hover:text-white"
             >
               <ArrowRight size={15} strokeWidth={1.6} />

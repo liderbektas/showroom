@@ -5,7 +5,7 @@ import { LayoutGrid } from "lucide-react";
 export default function MenuButton() {
   return (
     <button
-      aria-label="Menü"
+      aria-label="Menu"
       className="group fixed right-8 top-7 z-20 flex size-10 items-center justify-center text-white/70 transition-colors duration-300 hover:text-white"
     >
       <LayoutGrid

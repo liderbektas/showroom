@@ -2,9 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import gsap from "gsap";
-import { ChevronLeft, ChevronRight, Info, RotateCw, Scan } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight, ChevronLeft, ChevronRight, Info, RotateCw, Scan } from "lucide-react";
 import { VEHICLES, getVehicle, type VehicleSpec } from "@/data/vehicles";
 import { useShowroomStore } from "@/lib/showroom-store";
+import { playUiTick } from "@/lib/audio";
 
 const DISPLAY = { fontFamily: "var(--font-display), sans-serif" };
 
@@ -43,9 +45,10 @@ const ACTION =
 
 export default function BottomBar() {
   const vehicleId = useShowroomStore((s) => s.vehicleId);
+  const switchingTo = useShowroomStore((s) => s.switchingTo);
   const hotspotId = useShowroomStore((s) => s.hotspotId);
   const autoOrbit = useShowroomStore((s) => s.autoOrbit);
-  const setVehicle = useShowroomStore((s) => s.setVehicle);
+  const beginVehicle = useShowroomStore((s) => s.beginVehicle);
   const setHotspot = useShowroomStore((s) => s.setHotspot);
   const toggleAutoOrbit = useShowroomStore((s) => s.toggleAutoOrbit);
 
@@ -66,8 +69,10 @@ export default function BottomBar() {
   }, [vehicleId]);
 
   const cycle = (dir: number) => {
-    const next = (index + dir + VEHICLES.length) % VEHICLES.length;
-    setVehicle(VEHICLES[next].id);
+    const base = VEHICLES.findIndex((v) => v.id === (switchingTo ?? vehicleId));
+    const next = (base + dir + VEHICLES.length) % VEHICLES.length;
+    playUiTick();
+    beginVehicle(VEHICLES[next].id);
   };
 
   return (
@@ -75,14 +80,14 @@ export default function BottomBar() {
       <div className="flex h-full">
         <button
           onClick={() => cycle(-1)}
-          aria-label="Önceki araç"
+          aria-label="Previous vehicle"
           className="flex h-full w-[4.5rem] shrink-0 items-center justify-center text-white/50 transition-colors duration-300 hover:bg-white/[0.05] hover:text-white"
         >
           <ChevronLeft size={18} strokeWidth={1.6} />
         </button>
         <button
           onClick={() => cycle(1)}
-          aria-label="Sonraki araç"
+          aria-label="Next vehicle"
           className={`${CELL} w-[4.5rem] shrink-0 text-white/50 transition-colors duration-300 hover:bg-white/[0.05] hover:text-white`}
         >
           <ChevronRight size={18} strokeWidth={1.6} />
@@ -113,9 +118,12 @@ export default function BottomBar() {
 
         <div className={`${CELL} hidden w-[4.5rem] shrink-0 md:flex`}>
           <button
-            onClick={toggleAutoOrbit}
-            aria-label="360 derece döndür"
-            title="360° döndür"
+            onClick={() => {
+              playUiTick();
+              toggleAutoOrbit();
+            }}
+            aria-label="Rotate 360°"
+            title="Rotate 360°"
             className={`flex h-full w-full items-center justify-center transition-colors duration-300 ${
               autoOrbit
                 ? "bg-white/[0.04] text-white"
@@ -131,7 +139,10 @@ export default function BottomBar() {
         </div>
         <div className={`${CELL} hidden w-44 shrink-0 md:flex`}>
           <button
-            onClick={() => setHotspot(vehicle.hotspots[0]?.id ?? null)}
+            onClick={() => {
+              playUiTick();
+              setHotspot(vehicle.hotspots[0]?.id ?? null);
+            }}
             className={`${ACTION} ${
               hotspotId
                 ? "bg-white/[0.04] text-[color:var(--accent)]"
@@ -139,17 +150,30 @@ export default function BottomBar() {
             }`}
           >
             <Info size={13} strokeWidth={1.8} />
-            Details
+            Inspect
           </button>
         </div>
         <div className={`${CELL} hidden w-44 shrink-0 md:flex`}>
           <button
-            onClick={() => setHotspot(null)}
+            onClick={() => {
+              playUiTick();
+              setHotspot(null);
+            }}
             className={`${ACTION} text-white/60 hover:bg-white/[0.05] hover:text-white`}
           >
             <Scan size={13} strokeWidth={1.8} />
             Overview
           </button>
+        </div>
+        <div className={`${CELL} hidden w-44 shrink-0 md:flex`}>
+          <Link
+            href={`/exhibit/${vehicleId}`}
+            onClick={() => playUiTick()}
+            className={`${ACTION} text-white/60 hover:bg-white/[0.05] hover:text-white`}
+          >
+            <ArrowUpRight size={13} strokeWidth={1.8} />
+            Exhibit
+          </Link>
         </div>
       </div>
     </footer>

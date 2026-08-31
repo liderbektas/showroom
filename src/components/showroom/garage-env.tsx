@@ -55,7 +55,7 @@ function occlusionToGray(src: THREE.Texture) {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = src.wrapS;
   tex.wrapT = src.wrapT;
-  tex.anisotropy = 8;
+  tex.anisotropy = 16;
   grayCache.set(src.uuid, tex);
   return tex;
 }

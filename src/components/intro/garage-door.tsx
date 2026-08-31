@@ -2,12 +2,13 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Environment, Lightformer } from "@react-three/drei";
+import { Environment, Instance, Instances, Lightformer } from "@react-three/drei";
 import { Bloom, EffectComposer, N8AO, SMAA, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import gsap from "gsap";
 import { useIntroStore } from "@/lib/store";
 import GarageInterior from "@/components/intro/garage-interior";
+import Preloader from "@/components/intro/preloader";
 import {
   initAudio,
   playRelay,
@@ -39,7 +40,7 @@ const PANEL_W = 2.5;
 const PANEL_H = 1.2;
 const PANEL_GAP = 0.016;
 const PORTAL_HALF = 2.75;
-const PORTAL_TOP = 3.6;
+const PORTAL_TOP = DOOR_H + (PORTAL_HALF - DOOR_W / 2);
 
 function makeConcreteMaps() {
   const S = 512;
@@ -48,7 +49,7 @@ function makeConcreteMaps() {
   color.width = S;
   color.height = S;
   const c = color.getContext("2d")!;
-  c.fillStyle = "#c8c4ba";
+  c.fillStyle = "#c2c5c9";
   c.fillRect(0, 0, S, S);
 
   const normal = document.createElement("canvas");
@@ -71,7 +72,7 @@ function makeConcreteMaps() {
     const rad = 60 + Math.random() * 190;
     const light = Math.random() > 0.45;
     const g = c.createRadialGradient(x, y, 0, x, y, rad);
-    g.addColorStop(0, `rgba(${light ? "255,255,255" : "62,58,50"},${0.02 + Math.random() * 0.04})`);
+    g.addColorStop(0, `rgba(${light ? "255,255,255" : "52,56,62"},${0.02 + Math.random() * 0.04})`);
     g.addColorStop(1, "rgba(0,0,0,0)");
     c.fillStyle = g;
     c.fillRect(x - rad, y - rad, rad * 2, rad * 2);
@@ -87,8 +88,8 @@ function makeConcreteMaps() {
     const len = 90 + Math.random() * 340;
     const w = 5 + Math.random() * 20;
     const g = c.createLinearGradient(0, 0, 0, len);
-    g.addColorStop(0, `rgba(92,86,72,${0.02 + Math.random() * 0.035})`);
-    g.addColorStop(1, "rgba(92,86,72,0)");
+    g.addColorStop(0, `rgba(76,81,88,${0.02 + Math.random() * 0.035})`);
+    g.addColorStop(1, "rgba(76,81,88,0)");
     c.fillStyle = g;
     c.fillRect(x, 0, w, len);
   }
@@ -97,7 +98,7 @@ function makeConcreteMaps() {
     const x = Math.random() * S;
     const y = Math.random() * S;
     const l = Math.random() > 0.5;
-    c.fillStyle = `rgba(${l ? "255,255,255" : "48,44,38"},${0.015 + Math.random() * 0.03})`;
+    c.fillStyle = `rgba(${l ? "255,255,255" : "42,45,50"},${0.015 + Math.random() * 0.03})`;
     c.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
     const off = Math.round((Math.random() - 0.5) * 12);
     n.fillStyle = `rgba(${128 + off},${128 - off},255,0.10)`;
@@ -108,7 +109,7 @@ function makeConcreteMaps() {
     const x = Math.random() * S;
     const y = Math.random() * S;
     const rad = 0.6 + Math.random() * 1.6;
-    c.fillStyle = `rgba(40,36,30,${0.12 + Math.random() * 0.2})`;
+    c.fillStyle = `rgba(34,37,42,${0.12 + Math.random() * 0.2})`;
     c.beginPath();
     c.arc(x, y, rad, 0, Math.PI * 2);
     c.fill();
@@ -127,8 +128,8 @@ function makeConcreteMaps() {
     const x = hx * S;
     const y = hy * S;
     const g = c.createRadialGradient(x, y, 1, x, y, 9);
-    g.addColorStop(0, "rgba(70,64,54,0.5)");
-    g.addColorStop(0.55, "rgba(70,64,54,0.2)");
+    g.addColorStop(0, "rgba(56,60,66,0.5)");
+    g.addColorStop(0.55, "rgba(56,60,66,0.2)");
     g.addColorStop(1, "rgba(0,0,0,0)");
     c.fillStyle = g;
     c.fillRect(x - 9, y - 9, 18, 18);
@@ -137,14 +138,31 @@ function makeConcreteMaps() {
     ng.addColorStop(1, "rgba(128,128,255,0)");
     n.fillStyle = ng;
     n.fillRect(x - 8, y - 8, 16, 16);
+
+    const streakLen = 50 + Math.random() * 110;
+    const streak = c.createLinearGradient(0, y + 8, 0, y + 8 + streakLen);
+    streak.addColorStop(0, `rgba(60,65,72,${0.1 + Math.random() * 0.08})`);
+    streak.addColorStop(1, "rgba(60,65,72,0)");
+    c.fillStyle = streak;
+    c.fillRect(x - 5, y + 8, 10 + Math.random() * 4, streakLen);
   }
 
-  c.strokeStyle = "rgba(60,56,48,0.10)";
+  const grime = c.createLinearGradient(0, S, 0, S - 110);
+  grime.addColorStop(0, "rgba(42,46,52,0.18)");
+  grime.addColorStop(1, "rgba(42,46,52,0)");
+  c.fillStyle = grime;
+  c.fillRect(0, S - 110, S, 110);
+
+  c.strokeStyle = "rgba(50,54,60,0.10)";
   c.lineWidth = 14;
   c.strokeRect(7, 7, S - 14, S - 14);
-  c.strokeStyle = "rgba(60,56,48,0.12)";
+  c.strokeStyle = "rgba(50,54,60,0.12)";
   c.lineWidth = 4;
   c.strokeRect(2, 2, S - 4, S - 4);
+  c.fillStyle = "rgba(255,255,255,0.10)";
+  c.fillRect(0, 0, S, 3);
+  c.fillStyle = "rgba(26,29,33,0.22)";
+  c.fillRect(0, S - 3, S, 3);
 
   const toTex = (cv: HTMLCanvasElement, srgb = false) => {
     const t = new THREE.CanvasTexture(cv);
@@ -245,11 +263,11 @@ function Facade() {
   const mats = useMemo(
     () =>
       Array.from({ length: 4 }, makeConcreteMaps).flatMap((maps) =>
-        [0.97, 1.02].map((k) => {
+        [0.955, 1.0, 1.04].map((k) => {
           const m = new THREE.MeshStandardMaterial({
             ...maps,
             roughness: 1,
-            color: new THREE.Color(k, k, k * 0.99),
+            color: new THREE.Color(k * 0.99, k, k * 1.012),
           });
           m.normalScale.set(0.7, 0.7);
           return m;
@@ -282,6 +300,9 @@ function Facade() {
         }
         if (x0 < -PORTAL_HALF) push(x0, -PORTAL_HALF, y0, y1);
         if (x1 > PORTAL_HALF) push(PORTAL_HALF, x1, y0, y1);
+        if (y1 > PORTAL_TOP + 1e-4) {
+          push(Math.max(x0, -PORTAL_HALF), Math.min(x1, PORTAL_HALF), PORTAL_TOP, y1);
+        }
       }
     }
     return list;
@@ -303,13 +324,13 @@ function Facade() {
   return (
     <group>
       <mesh geometry={wallGeo} receiveShadow>
-        <meshStandardMaterial color="#57534b" roughness={1} />
+        <meshStandardMaterial color="#4b4e53" roughness={1} />
       </mesh>
 
       {panels.map((p, i) => (
         <mesh
           key={i}
-          position={[p.x, p.y, 0.022]}
+          position={[p.x, p.y, 0.022 + ((i * 137) % 5) * 0.0011]}
           material={mats[(i * 31 + 7) % mats.length]}
           castShadow
           receiveShadow
@@ -319,11 +340,45 @@ function Facade() {
       ))}
 
       {[-1, 1].map((s) => (
-        <mesh key={`plinth${s}`} position={[s * 8.875, 0.26, 0.045]} castShadow receiveShadow>
-          <boxGeometry args={[12.25, 0.52, 0.05]} />
-          <meshStandardMaterial color="#8d887d" roughness={0.98} />
+        <group key={`plinth${s}`}>
+          <mesh position={[s * 8.875, 0.31, 0.052]} castShadow receiveShadow>
+            <boxGeometry args={[12.25, 0.62, 0.055]} />
+            <meshStandardMaterial color="#34383e" roughness={0.55} metalness={0.2} />
+          </mesh>
+          <mesh position={[s * 8.875, 0.635, 0.055]}>
+            <boxGeometry args={[12.25, 0.03, 0.06]} />
+            <meshStandardMaterial color="#181a1d" roughness={0.4} metalness={0.4} />
+          </mesh>
+        </group>
+      ))}
+
+      {[-1, 1].map((s) => (
+        <group key={`sconce${s}`} position={[s * 3.32, 3.34, 0.09]}>
+          <mesh castShadow>
+            <boxGeometry args={[0.1, 0.4, 0.09]} />
+            <meshStandardMaterial color="#25282c" metalness={0.45} roughness={0.45} />
+          </mesh>
+          <mesh position={[0, -0.185, 0.02]} rotation-x={Math.PI / 2}>
+            <planeGeometry args={[0.075, 0.07]} />
+            <meshStandardMaterial color="#c8ccd2" roughness={0.35} />
+          </mesh>
+        </group>
+      ))}
+
+      <mesh position={[6.25, WALL_H / 2, 0.085]} castShadow>
+        <boxGeometry args={[0.12, WALL_H, 0.09]} />
+        <meshStandardMaterial color="#a2a6ac" roughness={0.8} metalness={0.2} />
+      </mesh>
+      {[0.85, 4.1].map((y) => (
+        <mesh key={y} position={[6.25, y, 0.05]}>
+          <boxGeometry args={[0.2, 0.05, 0.1]} />
+          <meshStandardMaterial color="#84888e" roughness={0.8} metalness={0.3} />
         </mesh>
       ))}
+      <mesh position={[6.25, 0.68, 0.11]} castShadow>
+        <boxGeometry args={[0.13, 0.16, 0.13]} />
+        <meshStandardMaterial color="#7d8187" roughness={0.75} metalness={0.25} />
+      </mesh>
 
       {[-1, 1].map((s) => (
         <mesh
@@ -359,26 +414,26 @@ function Facade() {
 
       <mesh position={[-3.75, WALL_H / 2, 0.09]} castShadow>
         <cylinderGeometry args={[0.055, 0.055, WALL_H, 12]} />
-        <meshStandardMaterial color="#b8b3a7" roughness={0.85} metalness={0.15} />
+        <meshStandardMaterial color="#aeb2b8" roughness={0.85} metalness={0.15} />
       </mesh>
       {[0.7, 3.4].map((y) => (
         <mesh key={y} position={[-3.75, y, 0.05]}>
           <boxGeometry args={[0.17, 0.05, 0.1]} />
-          <meshStandardMaterial color="#8f8a80" roughness={0.8} metalness={0.3} />
+          <meshStandardMaterial color="#84888e" roughness={0.8} metalness={0.3} />
         </mesh>
       ))}
 
       <mesh position={[-DOOR_W / 2, DOOR_H / 2, -RECESS / 2]} rotation-y={Math.PI / 2} receiveShadow>
         <planeGeometry args={[RECESS, DOOR_H]} />
-        <meshStandardMaterial color="#8a857a" roughness={0.95} />
+        <meshStandardMaterial color="#83868c" roughness={0.95} />
       </mesh>
       <mesh position={[DOOR_W / 2, DOOR_H / 2, -RECESS / 2]} rotation-y={-Math.PI / 2} receiveShadow>
         <planeGeometry args={[RECESS, DOOR_H]} />
-        <meshStandardMaterial color="#8a857a" roughness={0.95} />
+        <meshStandardMaterial color="#83868c" roughness={0.95} />
       </mesh>
       <mesh position={[0, DOOR_H, -RECESS / 2]} rotation-x={Math.PI / 2} receiveShadow>
         <planeGeometry args={[DOOR_W, RECESS]} />
-        <meshStandardMaterial color="#6f6a60" roughness={0.95} />
+        <meshStandardMaterial color="#686b70" roughness={0.95} />
       </mesh>
     </group>
   );
@@ -521,20 +576,20 @@ function makeApronMap() {
   cv.width = S;
   cv.height = S;
   const ctx = cv.getContext("2d")!;
-  ctx.fillStyle = "#a29c90";
+  ctx.fillStyle = "#999da2";
   ctx.fillRect(0, 0, S, S);
   for (let i = 0; i < 420; i++) {
     const y = Math.random() * S;
     const l = Math.random() > 0.5;
-    ctx.fillStyle = `rgba(${l ? "255,255,255" : "60,56,48"},${0.02 + Math.random() * 0.04})`;
+    ctx.fillStyle = `rgba(${l ? "255,255,255" : "50,54,60"},${0.02 + Math.random() * 0.04})`;
     ctx.fillRect(0, y, S, 1);
   }
   for (let i = 0; i < 900; i++) {
     const l = Math.random() > 0.5;
-    ctx.fillStyle = `rgba(${l ? "255,255,255" : "50,46,40"},${0.02 + Math.random() * 0.05})`;
+    ctx.fillStyle = `rgba(${l ? "255,255,255" : "44,48,54"},${0.02 + Math.random() * 0.05})`;
     ctx.fillRect(Math.random() * S, Math.random() * S, 1 + Math.random() * 2, 1 + Math.random() * 2);
   }
-  ctx.fillStyle = "rgba(40,38,34,0.55)";
+  ctx.fillStyle = "rgba(34,37,42,0.55)";
   ctx.fillRect(0, 0, 3, S);
   ctx.fillStyle = "rgba(255,255,255,0.10)";
   ctx.fillRect(3, 0, 1, S);
@@ -547,11 +602,40 @@ function makeApronMap() {
   return t;
 }
 
-const LANE_HALF = 2.5;
-const PAVER = 1.0;
-const PAVER_GAP = 0.012;
-const LANE_Z0 = 1.15;
-const LANE_ROWS = 8;
+const PAVE_HALF = 8.75;
+const SLAB_W = 1.25;
+const SLAB_D = 0.75;
+const PAVER_GAP = 0.02;
+const LANE_Z0 = 1.46;
+const LANE_ROWS = 11;
+
+function makeGrateMap() {
+  const W = 1024;
+  const H = 64;
+  const cv = document.createElement("canvas");
+  cv.width = W;
+  cv.height = H;
+  const ctx = cv.getContext("2d")!;
+  ctx.fillStyle = "#111316";
+  ctx.fillRect(0, 0, W, H);
+  for (let x = 6; x < W - 4; x += 14) {
+    ctx.fillStyle = "#3f444a";
+    ctx.fillRect(x, 5, 7, H - 10);
+    ctx.fillStyle = "#5a6067";
+    ctx.fillRect(x, 5, 7, 3);
+    ctx.fillStyle = "#0a0b0d";
+    ctx.fillRect(x + 7, 5, 7, H - 10);
+  }
+  ctx.strokeStyle = "#494e55";
+  ctx.lineWidth = 6;
+  ctx.strokeRect(2, 2, W - 4, H - 4);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = THREE.RepeatWrapping;
+  t.repeat.set(WALL_W / 5, 1);
+  t.anisotropy = 16;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 
 function makePaverMaps() {
   const S = 256;
@@ -560,7 +644,7 @@ function makePaverMaps() {
   color.width = S;
   color.height = S;
   const c = color.getContext("2d")!;
-  c.fillStyle = "#6d6a64";
+  c.fillStyle = "#3d3f43";
   c.fillRect(0, 0, S, S);
 
   const normal = document.createElement("canvas");
@@ -576,7 +660,7 @@ function makePaverMaps() {
     const rad = 40 + Math.random() * 90;
     const light = Math.random() > 0.5;
     const g = c.createRadialGradient(x, y, 0, x, y, rad);
-    g.addColorStop(0, `rgba(${light ? "255,255,255" : "30,28,24"},${0.02 + Math.random() * 0.04})`);
+    g.addColorStop(0, `rgba(${light ? "210,214,220" : "12,13,16"},${0.03 + Math.random() * 0.05})`);
     g.addColorStop(1, "rgba(0,0,0,0)");
     c.fillStyle = g;
     c.fillRect(x - rad, y - rad, rad * 2, rad * 2);
@@ -586,16 +670,19 @@ function makePaverMaps() {
     const x = Math.random() * S;
     const y = Math.random() * S;
     const l = Math.random() > 0.5;
-    c.fillStyle = `rgba(${l ? "255,255,255" : "34,32,28"},${0.02 + Math.random() * 0.04})`;
+    c.fillStyle = `rgba(${l ? "150,153,159" : "14,15,18"},${0.03 + Math.random() * 0.05})`;
     c.fillRect(x, y, 1, 1);
     const off = Math.round((Math.random() - 0.5) * 10);
     n.fillStyle = `rgba(${128 + off},${128 - off},255,0.10)`;
     n.fillRect(x, y, 1, 1);
   }
 
-  c.strokeStyle = "rgba(30,28,24,0.20)";
+  c.strokeStyle = "rgba(8,9,11,0.4)";
   c.lineWidth = 6;
   c.strokeRect(3, 3, S - 6, S - 6);
+  c.strokeStyle = "rgba(255,255,255,0.05)";
+  c.lineWidth = 2;
+  c.strokeRect(7, 7, S - 14, S - 14);
   n.strokeStyle = "rgba(128,112,255,0.35)";
   n.lineWidth = 4;
   n.strokeRect(2, 2, S - 4, S - 4);
@@ -612,31 +699,39 @@ function makePaverMaps() {
 function Ground() {
   const maps = useMemo(makeAsphaltMaps, []);
   const apron = useMemo(makeApronMap, []);
+  const grate = useMemo(makeGrateMap, []);
 
-  const paverMats = useMemo(
-    () =>
-      Array.from({ length: 3 }, makePaverMaps).flatMap((m) =>
-        [0.96, 1.03].map((k) => {
-          const mat = new THREE.MeshStandardMaterial({
-            ...m,
-            roughness: 0.88,
-            color: new THREE.Color(k, k, k * 0.995),
-          });
-          mat.normalScale.set(0.5, 0.5);
-          return mat;
-        })
-      ),
-    []
-  );
+  const paverMaps = useMemo(makePaverMaps, []);
 
-  const pavers = useMemo(() => {
-    const list: { x: number; z: number }[] = [];
+  const slabs = useMemo(() => {
+    type Slab = { x: number; y: number; z: number; ry: number; tint: string };
+    const full: Slab[] = [];
+    const half: Slab[] = [];
+    let idx = 0;
     for (let ri = 0; ri < LANE_ROWS; ri++) {
-      for (let ci = 0; ci < 5; ci++) {
-        list.push({ x: -LANE_HALF + PAVER / 2 + ci * PAVER, z: LANE_Z0 + PAVER / 2 + ri * PAVER });
+      const z = LANE_Z0 + SLAB_D / 2 + ri * SLAB_D;
+      const bounds: number[] = [-PAVE_HALF];
+      let b = -PAVE_HALF + (ri % 2 ? SLAB_W / 2 : SLAB_W);
+      while (b < PAVE_HALF - 1e-3) {
+        bounds.push(b);
+        b += SLAB_W;
+      }
+      bounds.push(PAVE_HALF);
+      for (let i = 0; i < bounds.length - 1; i++) {
+        const w = bounds[i + 1] - bounds[i];
+        const k = 0.93 + ((idx * 37) % 9) * 0.016;
+        const slab: Slab = {
+          x: (bounds[i] + bounds[i + 1]) / 2,
+          y: -0.002 - ((idx * 53) % 4) * 0.0009,
+          z,
+          ry: (((idx * 89) % 7) - 3) * 0.0022,
+          tint: new THREE.Color(k * 0.995, k, k * 1.008).getStyle(),
+        };
+        (w > SLAB_W * 0.75 ? full : half).push(slab);
+        idx++;
       }
     }
-    return list;
+    return { full, half };
   }, []);
 
   return (
@@ -655,23 +750,45 @@ function Ground() {
         <meshStandardMaterial map={apron} roughness={0.95} />
       </mesh>
 
-      {pavers.map((p, i) => (
-        <mesh
-          key={i}
-          position={[p.x, -0.002, p.z]}
-          material={paverMats[(i * 31 + 5) % paverMats.length]}
-          castShadow
-          receiveShadow
-        >
-          <boxGeometry args={[PAVER - PAVER_GAP, 0.03, PAVER - PAVER_GAP]} />
+      {[
+        { list: slabs.full, w: SLAB_W },
+        { list: slabs.half, w: SLAB_W / 2 },
+      ].map(({ list, w }) => (
+        <Instances key={w} limit={list.length} receiveShadow>
+          <boxGeometry args={[w - PAVER_GAP, 0.03, SLAB_D - PAVER_GAP]} />
+          <meshStandardMaterial
+            {...paverMaps}
+            roughness={0.94}
+            normalScale={new THREE.Vector2(0.5, 0.5)}
+          />
+          {list.map((s, i) => (
+            <Instance key={i} position={[s.x, s.y, s.z]} rotation={[0, s.ry, 0]} color={s.tint} />
+          ))}
+        </Instances>
+      ))}
+
+      <mesh position={[0, 0.007, 1.26]} rotation-x={-Math.PI / 2}>
+        <planeGeometry args={[WALL_W, 0.26]} />
+        <meshStandardMaterial map={grate} metalness={0.7} roughness={0.4} envMapIntensity={0.8} />
+      </mesh>
+      {[1.13, 1.39].map((z) => (
+        <mesh key={z} position={[0, 0.006, z]}>
+          <boxGeometry args={[WALL_W, 0.014, 0.03]} />
+          <meshStandardMaterial color="#54595f" metalness={0.8} roughness={0.35} />
         </mesh>
       ))}
 
       {[-1, 1].map((s) => (
-        <mesh key={s} position={[s * (LANE_HALF + 0.03), -0.001, LANE_Z0 + (LANE_ROWS * PAVER) / 2]} castShadow receiveShadow>
-          <boxGeometry args={[0.06, 0.036, LANE_ROWS * PAVER]} />
-          <meshStandardMaterial color="#84888d" metalness={0.85} roughness={0.35} envMapIntensity={1.1} />
-        </mesh>
+        <group key={`bollard${s}`} position={[s * 3.18, 0, 2.35]}>
+          <mesh position={[0, 0.29, 0]} castShadow>
+            <cylinderGeometry args={[0.062, 0.072, 0.58, 20]} />
+            <meshStandardMaterial color="#2b2e33" metalness={0.5} roughness={0.45} />
+          </mesh>
+          <mesh position={[0, 0.5, 0]}>
+            <cylinderGeometry args={[0.064, 0.064, 0.028, 20]} />
+            <meshStandardMaterial color="#9aa0a7" metalness={0.85} roughness={0.3} />
+          </mesh>
+        </group>
       ))}
     </group>
   );
@@ -1077,14 +1194,6 @@ function Dust({ progress }: { progress: React.RefObject<{ p: number }> }) {
   );
 }
 
-function signNoise(ctx: CanvasRenderingContext2D, w: number, h: number, count: number) {
-  for (let i = 0; i < count; i++) {
-    const l = Math.random() > 0.5;
-    ctx.fillStyle = `rgba(${l ? "255,255,255" : "40,38,32"},${0.01 + Math.random() * 0.03})`;
-    ctx.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 2, 1 + Math.random() * 2);
-  }
-}
-
 function drawScrew(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
   const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
   g.addColorStop(0, "#c9cdd1");
@@ -1102,141 +1211,53 @@ function drawScrew(ctx: CanvasRenderingContext2D, x: number, y: number, r: numbe
   ctx.stroke();
 }
 
-const VOLUME_ICON_PATHS = [
-  "M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z",
-  "M16 9a5 5 0 0 1 0 6",
-  "M19.364 18.364a9 9 0 0 0 0-12.728",
-];
-
-function makeWallSignMap() {
-  const W = 1792;
-  const H = 384;
+function makeGroundSignMap() {
+  const W = 768;
+  const H = 416;
   const cv = document.createElement("canvas");
   cv.width = W;
   cv.height = H;
   const ctx = cv.getContext("2d")!;
 
   const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, "#edeae1");
-  bg.addColorStop(1, "#ddd9cd");
+  bg.addColorStop(0, "#2e3136");
+  bg.addColorStop(0.5, "#26282d");
+  bg.addColorStop(1, "#2b2e33");
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
-  signNoise(ctx, W, H, 900);
 
-  ctx.strokeStyle = "#2b2e33";
-  ctx.lineWidth = 8;
-  ctx.strokeRect(26, 26, W - 52, H - 52);
+  for (let i = 0; i < 1100; i++) {
+    const y = Math.random() * H;
+    const l = Math.random() > 0.5;
+    ctx.fillStyle = `rgba(${l ? "255,255,255" : "0,0,0"},${0.012 + Math.random() * 0.03})`;
+    ctx.fillRect(Math.random() * W * 0.9, y, 20 + Math.random() * 90, 1);
+  }
 
-  ctx.save();
-  ctx.translate(96, H / 2 - 66);
-  ctx.scale(5.5, 5.5);
-  ctx.strokeStyle = "#2b2e33";
-  ctx.lineWidth = 2;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  for (const d of VOLUME_ICON_PATHS) ctx.stroke(new Path2D(d));
-  ctx.restore();
+  ctx.strokeStyle = "rgba(215,221,228,0.5)";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(14, 14, W - 28, H - 28);
 
-  (ctx as unknown as { letterSpacing: string }).letterSpacing = "12px";
-  ctx.fillStyle = "#2b2e33";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.font = "600 66px 'Helvetica Neue', Helvetica, Arial, sans-serif";
-  ctx.fillText("FOR THE BEST EXPERIENCE", 280, H * 0.37);
-  ctx.fillText("PLEASE TURN ON YOUR SOUND", 280, H * 0.66);
-
-  drawScrew(ctx, 52, 52, 13);
-  drawScrew(ctx, W - 52, 52, 13);
-  drawScrew(ctx, 52, H - 52, 13);
-  drawScrew(ctx, W - 52, H - 52, 13);
-
-  const streak = ctx.createLinearGradient(0, H - 60, 0, H);
-  streak.addColorStop(0, "rgba(120,100,70,0.10)");
-  streak.addColorStop(1, "rgba(120,100,70,0)");
-  ctx.fillStyle = streak;
-  ctx.fillRect(40, H - 60, 26, 60);
-
-  const t = new THREE.CanvasTexture(cv);
-  t.anisotropy = 8;
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-function WallSign() {
-  const map = useMemo(makeWallSignMap, []);
-  return (
-    <group position={[0, DOOR_H + 0.52, 0.095]}>
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={[1.96, 0.42, 0.03]} />
-        <meshStandardMaterial color="#d6d2c6" roughness={0.7} metalness={0.15} />
-      </mesh>
-      <mesh position-z={0.0155} receiveShadow>
-        <planeGeometry args={[1.96, 0.42]} />
-        <meshStandardMaterial map={map} roughness={0.55} metalness={0.05} />
-      </mesh>
-    </group>
-  );
-}
-
-function makeGroundSignMap() {
-  const W = 384;
-  const H = 768;
-  const cv = document.createElement("canvas");
-  cv.width = W;
-  cv.height = H;
-  const ctx = cv.getContext("2d")!;
-  const PAINT = "#ddd6c2";
+  const INK = "#eef1f5";
   const ls = ctx as unknown as { letterSpacing: string };
-
-  ctx.strokeStyle = PAINT;
-  ctx.lineWidth = 34;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.beginPath();
-  ctx.moveTo(W / 2, 300);
-  ctx.lineTo(W / 2, 60);
-  ctx.moveTo(W / 2 - 62, 130);
-  ctx.lineTo(W / 2, 42);
-  ctx.lineTo(W / 2 + 62, 130);
-  ctx.stroke();
-
-  ctx.fillStyle = PAINT;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+  ctx.fillStyle = INK;
   ctx.save();
-  ctx.translate(W / 2, 430);
-  ctx.scale(1, 2);
-  ls.letterSpacing = "5px";
-  ctx.font = "700 62px 'Helvetica Neue', Helvetica, Arial, sans-serif";
-  ctx.fillText("ENTER", 2, 0);
-  ctx.restore();
-
-  ctx.save();
-  ctx.translate(W / 2, 540);
+  ctx.translate(W / 2, 168);
   ctx.scale(1, 1.9);
-  ls.letterSpacing = "8px";
-  ctx.font = "700 30px 'Helvetica Neue', Helvetica, Arial, sans-serif";
-  ctx.fillText("CLICK TO OPEN", 4, 0);
+  ls.letterSpacing = "16px";
+  ctx.font = "700 36px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+  ctx.fillText("ENTER", 8, 0);
   ctx.restore();
 
-  ctx.globalCompositeOperation = "destination-out";
-  for (let i = 0; i < 2600; i++) {
-    const x = Math.random() * W;
-    const y = Math.random() * H;
-    ctx.fillStyle = `rgba(0,0,0,${0.25 + Math.random() * 0.55})`;
-    ctx.fillRect(x, y, 1 + Math.random() * 3, 1 + Math.random() * 2);
-  }
-  for (let i = 0; i < 14; i++) {
-    const x = Math.random() * W;
-    const y = Math.random() * H;
-    const r = 12 + Math.random() * 30;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, "rgba(0,0,0,0.5)");
-    g.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(x - r, y - r, r * 2, r * 2);
-  }
-  ctx.globalCompositeOperation = "source-over";
+  ctx.save();
+  ctx.translate(W / 2, 258);
+  ctx.scale(1, 1.9);
+  ls.letterSpacing = "12px";
+  ctx.font = "600 36px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+  ctx.fillStyle = "rgba(238,241,245,0.75)";
+  ctx.fillText("CLICK TO OPEN", 6, 0);
+  ctx.restore();
 
   const t = new THREE.CanvasTexture(cv);
   t.anisotropy = 8;
@@ -1248,7 +1269,7 @@ function GroundSign({ onEnter }: { onEnter: () => void }) {
   const map = useMemo(makeGroundSignMap, []);
   const [hover, setHover] = useState(false);
   const phase = useIntroStore((s) => s.phase);
-  const idle = phase === "loading" || phase === "ready";
+  const idle = phase === "ready";
 
   useEffect(() => {
     document.body.style.cursor = hover && idle ? "pointer" : "";
@@ -1258,9 +1279,8 @@ function GroundSign({ onEnter }: { onEnter: () => void }) {
   }, [hover, idle]);
 
   return (
-    <mesh
-      position={[0, 0.02, 2.45]}
-      rotation-x={-Math.PI / 2}
+    <group
+      position={[0, 0, 2.08]}
       onClick={(e) => {
         e.stopPropagation();
         onEnter();
@@ -1268,22 +1288,29 @@ function GroundSign({ onEnter }: { onEnter: () => void }) {
       onPointerOver={() => setHover(true)}
       onPointerOut={() => setHover(false)}
     >
-      <planeGeometry args={[1.1, 1.85]} />
-      <meshStandardMaterial
-        map={map}
-        transparent
-        color={hover && idle ? "#ffffff" : "#dcdcdc"}
-        roughness={0.9}
-        depthWrite={false}
-      />
-    </mesh>
+      <mesh position={[0, 0.02, 0]} castShadow receiveShadow>
+        <boxGeometry args={[1.56, 0.02, 0.88]} />
+        <meshStandardMaterial color="#43474d" metalness={0.65} roughness={0.32} envMapIntensity={1.1} />
+      </mesh>
+      <mesh position={[0, 0.0305, 0]} rotation-x={-Math.PI / 2}>
+        <planeGeometry args={[1.5, 0.82]} />
+        <meshStandardMaterial
+          map={map}
+          metalness={0.5}
+          roughness={0.42}
+          envMapIntensity={1.1}
+          emissive="#b9c0c8"
+          emissiveIntensity={hover && idle ? 0.22 : 0}
+        />
+      </mesh>
+    </group>
   );
 }
 
 export default function GarageDoor() {
   const phase = useIntroStore((s) => s.phase);
   const setPhase = useIntroStore((s) => s.setPhase);
-  const idle = phase === "loading" || phase === "ready";
+  const idle = phase === "ready";
 
   const progress = useRef({ p: 0 });
   const rig = useRef({ z: 8.2, parallax: 1 });
@@ -1334,7 +1361,6 @@ export default function GarageDoor() {
           <GarageInterior progress={progress} />
         </Suspense>
         <Door progress={progress} />
-        <WallSign />
         <GroundSign onEnter={enter} />
         <Details />
         <Dust progress={progress} />
@@ -1364,6 +1390,9 @@ export default function GarageDoor() {
       </Canvas>
 
       <Grain />
+
+      <Preloader />
+
 
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_62%,rgba(0,0,0,0.3)_100%)]" />
 

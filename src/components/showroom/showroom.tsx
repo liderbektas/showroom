@@ -9,6 +9,8 @@ import { useShowroomStore } from "@/lib/showroom-store";
 import GarageEnv from "@/components/showroom/garage-env";
 import VehicleStage from "@/components/showroom/vehicle-stage";
 import CameraController from "@/components/showroom/camera-controller";
+import SharpenOnIdle from "@/components/showroom/sharpen-on-idle";
+import VehicleTransition from "@/components/showroom/vehicle-transition";
 
 // [perf adım 1] r3f-perf turbopack ile çöktüğü için (nested drei9 bağımlılığı) dev HUD:
 // StatsGl (fps/ms/gpu) + DevPerf console logu (drawcall/tri, 2sn'de bir).
@@ -20,6 +22,8 @@ import CameraController from "@/components/showroom/camera-controller";
 // [perf adım 5] frameloop="demand": boşta 0 render/sn; orbit/gsap/yükleme invalidate eder.
 // [perf adım 8] N8AO kaldırıldı (tam ekran depth+AO+denoise passları gitti);
 // Bloom mipmap zinciri + Vignette + SMAA kaldı.
+// [perf adım 9] SharpenOnIdle: hareket halinde dpr 1.75, sahne durunca tek karelik
+// native dpr — demand modunda statik kare bedava olduğu için maliyetsiz keskinlik.
 
 function DevPerf() {
   const gl = useThree((s) => s.gl);
@@ -67,7 +71,7 @@ export default function Showroom() {
           {VEHICLE_ENABLED && <VehicleStage />}
         </Suspense>
 
-        <Environment resolution={256}>
+        <Environment resolution={512}>
           <Lightformer
             intensity={1.1}
             color="#e9edf3"
@@ -113,6 +117,8 @@ export default function Showroom() {
         </Environment>
 
         <CameraController />
+        <SharpenOnIdle />
+        <VehicleTransition />
 
         <EffectComposer multisampling={0}>
           <Bloom mipmapBlur levels={5} intensity={0.5} luminanceThreshold={1.0} />

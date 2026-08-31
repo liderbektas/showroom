@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { clone as skeletonClone } from "three/examples/jsm/utils/SkeletonUtils.js";
@@ -71,6 +72,17 @@ export default function Vehicle({
 }) {
   const { scene } = useGLTF(vehicle.model);
   const rig = useRef<THREE.Group>(null);
+  // Hotspot'lar DOM'da yaşadığı için WebGL'den önce belirir; aracın ilk karesi
+  // çizilmeden mount edilirlerse boş sahnede asılı görünürler.
+  const [hotspotsReady, setHotspotsReady] = useState(false);
+  const revealTimer = useRef(0);
+
+  useFrame(() => {
+    if (revealTimer.current) return;
+    revealTimer.current = window.setTimeout(() => setHotspotsReady(true), 350);
+  });
+
+  useEffect(() => () => window.clearTimeout(revealTimer.current), []);
 
   const logHotspotPoint = (e: { point: THREE.Vector3; stopPropagation: () => void }) => {
     if (process.env.NODE_ENV !== "development" || !rig.current) return;
@@ -167,6 +179,7 @@ export default function Vehicle({
       <group ref={rig} rotation-y={vehicle.stage.rotationY}>
         <primitive object={root} onClick={logHotspotPoint} />
         {interactive &&
+          hotspotsReady &&
           vehicle.hotspots.map((h, i) => <HotspotMarker key={h.id} hotspot={h} index={i} />)}
       </group>
     </group>

@@ -308,6 +308,10 @@ export function playChainTick(speed = 1, when = 0) {
   noise.stop(t + dur + 0.02);
 }
 
+export function playUiTick() {
+  click({ freq: 2600, gain: 0.07, noiseDur: 0.012, highpass: 1400 });
+}
+
 export function playSpotClack() {
   click({ freq: 2100, gain: 0.2, noiseDur: 0.018, highpass: 1000, toRoom: true });
   click({ freq: 900, gain: 0.08, noiseDur: 0.03, highpass: 400, toRoom: true, when: 0.02 });

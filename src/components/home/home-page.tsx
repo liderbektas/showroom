@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Showroom from "@/components/showroom/showroom";
 import HotspotPanel from "@/components/home/hotspot-panel";
 import BottomBar from "@/components/home/bottom-bar";
-import VehicleRail from "@/components/home/vehicle-rail";
 import MenuButton from "@/components/home/menu-button";
+import SoundToggle from "@/components/home/sound-toggle";
 import GrainOverlay from "@/components/home/grain-overlay";
 import { VEHICLE_ENABLED } from "@/data/vehicles";
 
@@ -21,10 +21,9 @@ export default function HomePage() {
   return (
     <main className="fixed inset-0 overflow-hidden bg-[#0a0b0d] text-[#e8eaec]">
       <Showroom />
-
       <GrainOverlay />
       <MenuButton />
-      {VEHICLE_ENABLED && <VehicleRail />}
+      <SoundToggle />
       {VEHICLE_ENABLED && <BottomBar />}
       {VEHICLE_ENABLED && <HotspotPanel />}
 
