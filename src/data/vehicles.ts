@@ -17,11 +17,12 @@ export type Vehicle = {
   tagline: string;
   model: string;
   stage: { length: number; rotationY: number };
+  paint?: { material: string; color: string };
   camera: HotspotCamera;
   hotspots: Hotspot[];
 };
 
-export const VEHICLE_ENABLED = false;
+export const VEHICLE_ENABLED = true;
 
 export const STAGE_POS: [number, number, number] = [0, 0, 7.2];
 
@@ -31,8 +32,8 @@ export const VEHICLES: Vehicle[] = [
     name: "Mercedes-Benz",
     tagline: "Showroom · İlk model",
     model: "/models/mercedes.opt.glb",
-    stage: { length: 4.55, rotationY: 0 },
-    camera: { pos: [0, 1.35, -12.4], target: [0, 1.1, 2.3] },
+    stage: { length: 4.9, rotationY: Math.PI - 0.55 },
+    camera: { pos: [0.5, 1.25, -8.6], target: [0, 0.85, 0.4] },
     hotspots: [
       {
         id: "front",

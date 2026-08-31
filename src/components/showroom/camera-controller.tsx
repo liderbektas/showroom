@@ -19,8 +19,11 @@ const BOUNDS = {
   z: [-5.6, 20.6],
 } as const;
 
+// [perf adım 5] gsap kamera uçuşu demand modunda her tween karesinde invalidate eder;
+// timeline bitince kare üretimi durur. Orbit damping'i drei kendi invalidate zinciriyle sürdürür.
 export default function CameraController() {
   const camera = useThree((s) => s.camera);
+  const invalidate = useThree((s) => s.invalidate);
   const controls = useRef<OrbitControlsImpl>(null);
   const vehicleId = useShowroomStore((s) => s.vehicleId);
   const hotspotId = useShowroomStore((s) => s.hotspotId);
@@ -50,9 +53,13 @@ export default function CameraController() {
 
     ctrl.enabled = false;
     const tl = gsap.timeline({
-      onUpdate: () => ctrl.update(),
+      onUpdate: () => {
+        ctrl.update();
+        invalidate();
+      },
       onComplete: () => {
         ctrl.enabled = true;
+        invalidate();
       },
     });
     tl.to(camera.position, { x: pos[0], y: pos[1], z: pos[2], duration: 1.4, ease: "power3.inOut" }, 0)
@@ -62,7 +69,7 @@ export default function CameraController() {
       tl.kill();
       ctrl.enabled = true;
     };
-  }, [camera, vehicleId, hotspotId]);
+  }, [camera, invalidate, vehicleId, hotspotId]);
 
   return (
     <OrbitControls

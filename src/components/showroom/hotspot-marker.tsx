@@ -14,7 +14,6 @@ export default function HotspotMarker({ hotspot }: { hotspot: Hotspot }) {
     <Html
       position={hotspot.position}
       center
-      occlude
       zIndexRange={[40, 0]}
       style={{ transition: "opacity 0.35s", opacity: dimmed ? 0.25 : 1 }}
     >

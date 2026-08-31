@@ -1,27 +1,86 @@
 "use client";
 
-import { Suspense } from "react";
-import { Canvas } from "@react-three/fiber";
-import { ContactShadows, Environment, Lightformer } from "@react-three/drei";
-import { Bloom, EffectComposer, N8AO, SMAA, Vignette } from "@react-three/postprocessing";
-import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
-import { STAGE_POS, VEHICLE_ENABLED } from "@/data/vehicles";
+import { Suspense, useRef } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { ContactShadows, Environment, Lightformer, StatsGl } from "@react-three/drei";
+import { Bloom, EffectComposer, SMAA, Vignette } from "@react-three/postprocessing";
+import { STAGE_POS, VEHICLE_ENABLED, getVehicle } from "@/data/vehicles";
 import { useShowroomStore } from "@/lib/showroom-store";
 import GarageEnv from "@/components/showroom/garage-env";
+import Vehicle from "@/components/showroom/vehicle";
 import CameraController from "@/components/showroom/camera-controller";
 
+// [perf adım 1] r3f-perf turbopack ile çöktüğü için (nested drei9 bağımlılığı) dev HUD:
+// StatsGl (fps/ms/gpu) + DevPerf console logu (drawcall/tri, 2sn'de bir).
+// Başlangıç (ışıklı/PBR/N8AO/dpr2): ~80 drawcall, ~881K tri.
+// [perf adım 2] 4 real-time ışık (hemisphere + 3 rectArea) söküldü; garaj unlit basic,
+// araba yalnız Environment IBL ile. Drawcall 80→76, ışık başına fragment maliyeti 0.
+// [perf adım 3+4] Sahne unlit olunca GPU bütçesi açıldı: dpr tavanı native 2.0,
+// AdaptiveDpr tabanı 1.5 (daha aşağı asla inmez — pixelleşme sınırı). fps<45'te 1.5'e
+// düşer, fps>55'te 2.0'a döner; demand modundaki kare boşlukları (>250ms) pencereyi sıfırlar.
+// [perf adım 5] frameloop="demand": boşta 0 render/sn; orbit/gsap/yükleme invalidate eder.
+// [perf adım 8] N8AO kaldırıldı (tam ekran depth+AO+denoise passları gitti);
+// Bloom mipmap zinciri + Vignette + SMAA kaldı.
 
-if (typeof window !== "undefined") {
-  RectAreaLightUniformsLib.init();
+function DevPerf() {
+  const gl = useThree((s) => s.gl);
+  const last = useRef(0);
+
+  useFrame(() => {
+    const now = performance.now();
+    if (now - last.current < 2000) return;
+    last.current = now;
+    const { calls, triangles } = gl.info.render;
+    console.log(`[perf] drawcalls=${calls} tris=${triangles}`);
+  });
+
+  return null;
+}
+
+function AdaptiveDpr() {
+  const setDpr = useThree((s) => s.setDpr);
+  const last = useRef(0);
+  const acc = useRef(0);
+  const count = useRef(0);
+  const level = useRef(2);
+
+  useFrame(() => {
+    const now = performance.now();
+    const dt = now - last.current;
+    last.current = now;
+    if (dt > 250) {
+      acc.current = 0;
+      count.current = 0;
+      return;
+    }
+    acc.current += dt;
+    count.current++;
+    if (count.current < 40) return;
+    const fps = 1000 / (acc.current / count.current);
+    acc.current = 0;
+    count.current = 0;
+    if (fps < 45 && level.current > 1.55) {
+      level.current = 1.5;
+      setDpr(Math.min(1.5, window.devicePixelRatio));
+    } else if (fps > 55 && level.current < 1.95) {
+      level.current = 2;
+      setDpr(Math.min(2, window.devicePixelRatio));
+    }
+  });
+
+  return null;
 }
 
 export default function Showroom() {
+  const vehicleId = useShowroomStore((s) => s.vehicleId);
   const setHotspot = useShowroomStore((s) => s.setHotspot);
+  const vehicle = getVehicle(vehicleId);
 
   return (
     <div className="absolute inset-0">
       <Canvas
-        dpr={[1, 1.5]}
+        frameloop="demand"
+        dpr={[1, 2]}
         gl={{
           antialias: false,
           stencil: false,
@@ -32,15 +91,24 @@ export default function Showroom() {
         onPointerMissed={() => setHotspot(null)}
       >
         <color attach="background" args={["#0a0b0d"]} />
+        {process.env.NODE_ENV === "development" && (
+          <>
+            <StatsGl />
+            <DevPerf />
+          </>
+        )}
+        <AdaptiveDpr />
 
         <Suspense fallback={null}>
           <GarageEnv />
+          {VEHICLE_ENABLED && <Vehicle vehicle={vehicle} />}
           {VEHICLE_ENABLED && (
             <ContactShadows
+              key={vehicleId}
               position={[STAGE_POS[0], 0.012, STAGE_POS[2]]}
               scale={11}
-              blur={2.4}
-              opacity={0.6}
+              blur={2}
+              opacity={0.5}
               far={2.6}
               resolution={512}
               frames={1}
@@ -49,22 +117,24 @@ export default function Showroom() {
           )}
         </Suspense>
 
-        <hemisphereLight args={["#eef1f5", "#5a5d63", 0.42]} />
-        {[-1, 1].map((s) => (
-          <rectAreaLight
-            key={s}
-            position={[s * 5.1, 3.25, 7]}
-            rotation={[-Math.PI / 2, 0, s * 0.55]}
-            args={["#f2f5fa", 4.2, 0.5, 24]}
-          />
-        ))}
-        <rectAreaLight
-          position={[0, 3.3, STAGE_POS[2]]}
-          rotation-x={-Math.PI / 2}
-          args={["#f2f5fa", 2.2, 3.4, 4.6]}
-        />
-
         <Environment resolution={256}>
+          <Lightformer
+            intensity={1.1}
+            color="#e9edf3"
+            position={[0, 7, 7]}
+            rotation-x={Math.PI / 2}
+            scale={[26, 30, 1]}
+          />
+          {[-1, 1].map((s) => (
+            <Lightformer
+              key={`side${s}`}
+              intensity={0.55}
+              color="#d4d9e0"
+              position={[s * 9, 2, 7]}
+              rotation-y={(-s * Math.PI) / 2}
+              scale={[26, 5, 1]}
+            />
+          ))}
           <Lightformer
             intensity={3.2}
             color="#f4f7fb"
@@ -95,8 +165,7 @@ export default function Showroom() {
         <CameraController />
 
         <EffectComposer multisampling={0}>
-          <N8AO halfRes quality="medium" aoRadius={1.2} intensity={2.6} distanceFalloff={1} />
-          <Bloom mipmapBlur intensity={0.35} luminanceThreshold={1.0} />
+          <Bloom mipmapBlur levels={5} intensity={0.35} luminanceThreshold={1.0} />
           <Vignette offset={0.26} darkness={0.62} />
           <SMAA />
         </EffectComposer>
