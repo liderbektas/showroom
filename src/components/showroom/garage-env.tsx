@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useGLTF } from "@react-three/drei";
+import { Reflector } from "three-stdlib";
 import * as THREE from "three";
 import { STAGE_POS } from "@/data/vehicles";
 
@@ -58,6 +59,62 @@ function occlusionToGray(src: THREE.Texture) {
   grayCache.set(src.uuid, tex);
   return tex;
 }
+function MirrorWall({
+  width,
+  height,
+  position,
+  rotationY,
+  resolution,
+}: {
+  width: number;
+  height: number;
+  position: [number, number, number];
+  rotationY: number;
+  resolution: [number, number];
+}) {
+  const mirror = useMemo(() => {
+    const geo = new THREE.PlaneGeometry(width, height);
+    const reflector = new Reflector(geo, {
+      textureWidth: resolution[0],
+      textureHeight: resolution[1],
+      color: new THREE.Color("#70747a"),
+      clipBias: 0.003,
+    });
+    const original = reflector.onBeforeRender.bind(reflector);
+    reflector.onBeforeRender = (renderer, scene, camera, geometry, material, group) => {
+      const fog = scene.fog;
+      scene.fog = null;
+      original(renderer, scene, camera, geometry, material, group);
+      scene.fog = fog;
+    };
+    return reflector;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      mirror.dispose();
+    };
+  }, [mirror]);
+
+  return <primitive object={mirror} position={position} rotation-y={rotationY} />;
+}
+
+function LightColumn({ x, z }: { x: number; z: number }) {
+  return (
+    <group position={[x, 0, z]}>
+      <mesh position={[0, 1.72, 0]}>
+        <boxGeometry args={[0.1, 3.44, 0.16]} />
+        <meshBasicMaterial color="#101114" />
+      </mesh>
+      <mesh position={[x > 0 ? -0.056 : 0.056, 1.72, 0]}>
+        <boxGeometry args={[0.012, 3.32, 0.05]} />
+        <meshBasicMaterial color={new THREE.Color(1.5, 1.55, 1.65)} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
 export default function GarageEnv() {
   const { scene } = useGLTF(MODEL);
   const poolTex = useMemo(() => makePoolMap(), []);
@@ -95,6 +152,29 @@ export default function GarageEnv() {
         <planeGeometry args={[16, 5]} />
         <meshBasicMaterial color="#0a0b0d" side={THREE.DoubleSide} />
       </mesh>
+      <LightColumn x={-6.3} z={3.4} />
+      <LightColumn x={6.3} z={3.4} />
+      <MirrorWall
+        width={12.8}
+        height={4.2}
+        position={[0, 2.12, 21.55]}
+        rotationY={Math.PI}
+        resolution={[2048, 1024]}
+      />
+      <MirrorWall
+        width={17.5}
+        height={2.8}
+        position={[-6.38, 1.44, 12.4]}
+        rotationY={Math.PI / 2}
+        resolution={[1024, 512]}
+      />
+      <MirrorWall
+        width={17.5}
+        height={2.8}
+        position={[6.38, 1.44, 12.4]}
+        rotationY={-Math.PI / 2}
+        resolution={[1024, 512]}
+      />
       <mesh position={[STAGE_POS[0], 0.008, STAGE_POS[2] + 1]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[30, 34]} />
         <meshBasicMaterial map={poolTex} color="#000000" transparent depthWrite={false} />

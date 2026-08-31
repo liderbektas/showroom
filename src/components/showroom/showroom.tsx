@@ -54,7 +54,7 @@ export default function Showroom() {
         onPointerMissed={() => setHotspot(null)}
       >
         <color attach="background" args={["#0a0b0d"]} />
-        <fog attach="fog" args={["#08090b", 13, 34]} />
+        <fog attach="fog" args={["#08090b", 20, 52]} />
         {process.env.NODE_ENV === "development" && (
           <>
             <StatsGl />
