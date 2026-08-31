@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Environment, Lightformer } from "@react-three/drei";
+import { Environment, Lightformer, PerformanceMonitor } from "@react-three/drei";
+import { Bloom, EffectComposer, N8AO, SMAA, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import gsap from "gsap";
 import { useIntroStore } from "@/lib/store";
+import GarageInterior from "@/components/intro/garage-interior";
 import {
   initAudio,
   playRelay,
   startMotor,
   stopMotor,
+  setMotorSpeed,
   playChainTick,
   startExteriorAmbience,
   crossfadeToInterior,
@@ -24,7 +27,10 @@ const SLATS = 8;
 const SLAT_H = DOOR_H / SLATS;
 const TRACK_R = 0.5;
 const ARC = TRACK_R * (Math.PI / 2);
-const LIFT_MAX = DOOR_H + ARC + 0.6;
+const LIFT_MAX = DOOR_H + ARC + 0.2;
+const DOOR_TRAVEL = 2.9;
+
+const INSPECT_INTERIOR = true;
 
 const WALL_W = 30;
 const WALL_H = 12;
@@ -672,34 +678,6 @@ function Ground() {
 }
 
 
-function Interior() {
-  return (
-    <group>
-      <mesh position={[0, 0, -4.3]} rotation-x={-Math.PI / 2}>
-        <planeGeometry args={[7.4, 7.7]} />
-        <meshStandardMaterial color="#141517" roughness={0.55} metalness={0.1} envMapIntensity={0.35} />
-      </mesh>
-      <mesh position={[0, 3.4, -4.3]} rotation-x={Math.PI / 2}>
-        <planeGeometry args={[7.4, 7.7]} />
-        <meshStandardMaterial color="#0b0c0e" roughness={1} />
-      </mesh>
-      <mesh position={[0, 1.7, -8.15]}>
-        <planeGeometry args={[7.4, 3.4]} />
-        <meshStandardMaterial color="#0c0d10" roughness={1} />
-      </mesh>
-      <mesh position={[-3.7, 1.7, -4.3]} rotation-y={Math.PI / 2}>
-        <planeGeometry args={[7.7, 3.4]} />
-        <meshStandardMaterial color="#0e0f12" roughness={1} />
-      </mesh>
-      <mesh position={[3.7, 1.7, -4.3]} rotation-y={-Math.PI / 2}>
-        <planeGeometry args={[7.7, 3.4]} />
-        <meshStandardMaterial color="#0e0f12" roughness={1} />
-      </mesh>
-      <pointLight position={[0, 2.7, -4.5]} intensity={3} distance={9} color="#ffd9a6" />
-    </group>
-  );
-}
-
 function Door({ progress }: { progress: React.RefObject<{ p: number }> }) {
   const geo = useMemo(makeSlatGeometry, []);
   const peel = useMemo(makeOrangePeelNormal, []);
@@ -789,6 +767,36 @@ function CameraRig({ rig }: { rig: React.RefObject<{ z: number; parallax: number
   return null;
 }
 
+function setShadowAuto(gl: THREE.WebGLRenderer, auto: boolean) {
+  gl.shadowMap.autoUpdate = auto;
+}
+
+function kickShadows(gl: THREE.WebGLRenderer) {
+  gl.shadowMap.needsUpdate = true;
+}
+
+function ShadowControl({ progress }: { progress: React.RefObject<{ p: number }> }) {
+  const gl = useThree((state) => state.gl);
+  const lastP = useRef(-1);
+  const warmup = useRef(0);
+
+  useEffect(() => {
+    setShadowAuto(gl, false);
+    return () => setShadowAuto(gl, true);
+  }, [gl]);
+
+  useFrame(() => {
+    const p = progress.current.p;
+    if (warmup.current < 12 || Math.abs(p - lastP.current) > 1e-4) {
+      warmup.current++;
+      lastP.current = p;
+      kickShadows(gl);
+    }
+  });
+
+  return null;
+}
+
 function Sequence({
   progress,
   rig,
@@ -804,30 +812,43 @@ function Sequence({
   useEffect(() => {
     if (phase !== "opening") return;
 
-    let lastTick = 0;
+    let lastP = 0;
+    let lastT = 0;
+    let sinceTick = 0;
     const tl = gsap.timeline({ onComplete: () => setPhase("inside") });
     tl.call(playRelay, undefined, 0.05)
       .call(playSpotClack, undefined, 0.32)
       .call(startMotor, undefined, 0.55)
       .to(progress.current, {
         p: 1,
-        duration: 3.3,
-        ease: "power2.inOut",
+        duration: DOOR_TRAVEL,
+        ease: "power1.inOut",
         onUpdate() {
-          const p = this.progress();
-          if (p - lastTick > 0.07) {
-            lastTick = p;
-            playChainTick();
+          const p = progress.current.p;
+          const t = this.time();
+          const dt = t - lastT;
+          if (dt <= 0) return;
+          const dp = p - lastP;
+          const speed = (dp / dt) * (DOOR_TRAVEL / 2);
+          lastP = p;
+          lastT = t;
+          setMotorSpeed(speed);
+          sinceTick += dp;
+          if (sinceTick > 0.055) {
+            sinceTick = 0;
+            playChainTick(speed);
           }
         },
+        onComplete: stopMotor,
       }, 0.7)
-      .call(stopMotor, undefined, 4.0)
-      .to(rig.current, { z: -1.6, duration: 2.7, ease: "power2.in" }, 2.3)
-      .to(rig.current, { parallax: 0, duration: 1.2, ease: "none" }, 2.3)
+      .to(rig.current, { z: -1.6, duration: 4.2, ease: "power2.inOut" }, 2.3)
       .call(crossfadeToInterior, undefined, 4.0);
 
-    if (fade.current) {
-      tl.to(fade.current, { opacity: 1, duration: 0.55, ease: "power1.in" }, 4.4);
+    if (!INSPECT_INTERIOR) {
+      tl.to(rig.current, { parallax: 0, duration: 1.2, ease: "none" }, 2.3);
+      if (fade.current) {
+        tl.to(fade.current, { opacity: 1, duration: 0.6, ease: "power1.in" }, 5.9);
+      }
     }
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -836,6 +857,7 @@ function Sequence({
 
     return () => {
       tl.kill();
+      stopMotor(false);
     };
   }, [phase, setPhase, progress, rig, fade]);
 
@@ -1258,6 +1280,7 @@ export default function GarageDoor() {
   const setPhase = useIntroStore((s) => s.setPhase);
   const idle = phase === "loading" || phase === "ready";
 
+  const [dpr, setDpr] = useState(1.5);
   const progress = useRef({ p: 0 });
   const rig = useRef({ z: 8.2, parallax: 1 });
   const fade = useRef<HTMLDivElement>(null);
@@ -1285,13 +1308,33 @@ export default function GarageDoor() {
 
   return (
     <div className="fixed inset-0 bg-[#cfd3d6]">
-      <Canvas shadows dpr={[1, 2]} gl={{ antialias: true }} camera={{ fov: 35, position: [0, 1.5, 8.2] }}>
+      <Canvas
+        shadows
+        dpr={dpr}
+        gl={{
+          antialias: false,
+          stencil: false,
+          powerPreference: "high-performance",
+          toneMappingExposure: 1.08,
+        }}
+        camera={{ fov: 39, position: [0, 1.5, 8.2] }}
+      >
+        <fog attach="fog" args={["#0a0c10", 16, 46]} />
+        <PerformanceMonitor
+          onIncline={() => setDpr(Math.min(2, window.devicePixelRatio))}
+          onDecline={() => setDpr(1.35)}
+          flipflops={2}
+          onFallback={() => setDpr(1.35)}
+        />
+        <ShadowControl progress={progress} />
         <CameraRig rig={rig} />
         <Sequence progress={progress} rig={rig} fade={fade} />
         <Facade />
         <FoliageShadow />
         <Ground />
-        <Interior />
+        <Suspense fallback={null}>
+          <GarageInterior progress={progress} />
+        </Suspense>
         <Door progress={progress} />
         <WallSign />
         <GroundSign onEnter={enter} />
@@ -1314,6 +1357,12 @@ export default function GarageDoor() {
           <Lightformer intensity={0.8} color="#dde3e8" position={[0, 1.8, 9]} scale={[20, 7, 1]} />
           <Lightformer intensity={0.25} color="#b8bdc2" position={[-8, 3, 5]} rotation-y={Math.PI / 5} scale={[4, 6, 1]} />
         </Environment>
+        <EffectComposer multisampling={0}>
+          <N8AO halfRes quality="medium" aoRadius={1.7} intensity={3.6} distanceFalloff={1} />
+          <Bloom mipmapBlur intensity={0.4} luminanceThreshold={1.0} />
+          <Vignette offset={0.28} darkness={0.55} />
+          <SMAA />
+        </EffectComposer>
       </Canvas>
 
       <Grain />

@@ -2,7 +2,6 @@ let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let roomSend: GainNode | null = null;
 
-let motorNodes: { gain: GainNode; stops: (() => void)[] } | null = null;
 let exteriorGain: GainNode | null = null;
 let interiorGain: GainNode | null = null;
 let muted = false;
@@ -105,11 +104,11 @@ function click({
   noise.stop(t + noiseDur + 0.02);
 
   const osc = ctx.createOscillator();
-  osc.type = "square";
+  osc.type = "triangle";
   osc.frequency.value = freq;
   const og = ctx.createGain();
-  og.gain.setValueAtTime(gain * 0.5, t);
-  og.gain.exponentialRampToValueAtTime(0.001, t + 0.008);
+  og.gain.setValueAtTime(gain * 0.22, t);
+  og.gain.exponentialRampToValueAtTime(0.001, t + 0.01);
   osc.connect(og);
   og.connect(master);
   if (toRoom && roomSend) og.connect(roomSend);
@@ -118,120 +117,195 @@ function click({
 }
 
 export function playRelay() {
-  click({ freq: 2600, gain: 0.16 });
-  click({ freq: 1400, gain: 0.24, noiseDur: 0.02, highpass: 600, when: 0.06 });
+  click({ freq: 1900, gain: 0.12, noiseDur: 0.012, highpass: 1200 });
+  click({ freq: 700, gain: 0.16, noiseDur: 0.03, highpass: 400, when: 0.055, toRoom: true });
 }
+
+type Motor = {
+  out: GainNode;
+  hum: OscillatorNode[];
+  humBase: number[];
+  clatter: GainNode;
+  drive: GainNode;
+  stops: (() => void)[];
+};
+
+let motorNodes: Motor | null = null;
 
 export function startMotor() {
   if (!ctx || !master || motorNodes) return;
   const t = ctx.currentTime;
   const stops: (() => void)[] = [];
 
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.0001, t);
-  gain.gain.exponentialRampToValueAtTime(0.2, t + 0.4);
-  gain.connect(master);
+  const out = ctx.createGain();
+  out.gain.setValueAtTime(0.0001, t);
+  out.gain.setTargetAtTime(0.35, t, 0.15);
+  out.connect(master);
+  if (roomSend) {
+    const room = ctx.createGain();
+    room.gain.value = 0.3;
+    out.connect(room).connect(roomSend);
+  }
 
-  const hp = ctx.createBiquadFilter();
-  hp.type = "highpass";
-  hp.frequency.value = 160;
-  hp.connect(gain);
+  const rumbleSrc = ctx.createBufferSource();
+  rumbleSrc.buffer = noiseBuffer(4);
+  rumbleSrc.loop = true;
+  const lp1 = ctx.createBiquadFilter();
+  lp1.type = "lowpass";
+  lp1.frequency.value = 170;
+  const lp2 = ctx.createBiquadFilter();
+  lp2.type = "lowpass";
+  lp2.frequency.value = 260;
+  const rumbleGain = ctx.createGain();
+  rumbleGain.gain.value = 0.5;
+  rumbleSrc.connect(lp1).connect(lp2).connect(rumbleGain).connect(out);
 
-  const osc1 = ctx.createOscillator();
-  osc1.type = "sawtooth";
-  osc1.frequency.value = 118;
-  const osc2 = ctx.createOscillator();
-  osc2.type = "sawtooth";
-  osc2.frequency.value = 119.7;
+  const driveSrc = ctx.createBufferSource();
+  driveSrc.buffer = noiseBuffer(4);
+  driveSrc.loop = true;
+  const driveBp = ctx.createBiquadFilter();
+  driveBp.type = "bandpass";
+  driveBp.frequency.value = 330;
+  driveBp.Q.value = 1.4;
+  const drive = ctx.createGain();
+  drive.gain.value = 0.16;
+  driveSrc.connect(driveBp).connect(drive).connect(out);
+
+  const clatterSrc = ctx.createBufferSource();
+  clatterSrc.buffer = noiseBuffer(4);
+  clatterSrc.loop = true;
+  const clatterBp = ctx.createBiquadFilter();
+  clatterBp.type = "bandpass";
+  clatterBp.frequency.value = 1400;
+  clatterBp.Q.value = 0.8;
+  const clatter = ctx.createGain();
+  clatter.gain.value = 0.05;
+  clatterSrc.connect(clatterBp).connect(clatter).connect(out);
+
+  const sprocket = ctx.createOscillator();
+  sprocket.type = "sine";
+  sprocket.frequency.value = 6.5;
+  const sprocketDepth = ctx.createGain();
+  sprocketDepth.gain.value = 0.02;
+  sprocket.connect(sprocketDepth).connect(clatter.gain);
+
+  const sway = ctx.createOscillator();
+  sway.type = "sine";
+  sway.frequency.value = 1.7;
+  const swayDepth = ctx.createGain();
+  swayDepth.gain.value = 0.03;
+  sway.connect(swayDepth).connect(drive.gain);
+
   const humLp = ctx.createBiquadFilter();
   humLp.type = "lowpass";
-  humLp.frequency.value = 750;
-  const humGain = ctx.createGain();
-  humGain.gain.value = 0.09;
-  osc1.connect(humLp);
-  osc2.connect(humLp);
-  humLp.connect(humGain).connect(hp);
+  humLp.frequency.value = 700;
+  humLp.connect(out);
 
-  const slide = ctx.createBufferSource();
-  slide.buffer = noiseBuffer(2);
-  slide.loop = true;
-  const slideBp = ctx.createBiquadFilter();
-  slideBp.type = "bandpass";
-  slideBp.frequency.value = 1500;
-  slideBp.Q.value = 0.7;
-  const slideGain = ctx.createGain();
-  slideGain.gain.value = 0.5;
-  slide.connect(slideBp).connect(slideGain).connect(hp);
+  const humBase = [60, 120, 180];
+  const humLevel = [0.02, 0.035, 0.012];
+  const hum: OscillatorNode[] = [];
+  humBase.forEach((f, i) => {
+    const osc = ctx!.createOscillator();
+    osc.type = i === 2 ? "triangle" : "sine";
+    osc.frequency.setValueAtTime(f * 0.55, t);
+    osc.frequency.setTargetAtTime(f, t, 0.14);
+    const g = ctx!.createGain();
+    g.gain.value = humLevel[i];
+    osc.connect(g).connect(humLp);
+    hum.push(osc);
+  });
 
-  const body = ctx.createBufferSource();
-  body.buffer = noiseBuffer(2);
-  body.loop = true;
-  const bodyBp = ctx.createBiquadFilter();
-  bodyBp.type = "bandpass";
-  bodyBp.frequency.value = 480;
-  bodyBp.Q.value = 0.9;
-  const bodyGain = ctx.createGain();
-  bodyGain.gain.value = 0.28;
-  body.connect(bodyBp).connect(bodyGain).connect(hp);
-
-  const rattle = ctx.createOscillator();
-  rattle.frequency.value = 26;
-  const rattleGain = ctx.createGain();
-  rattleGain.gain.value = 0.16;
-  rattle.connect(rattleGain).connect(slideGain.gain);
-
-  const surge = ctx.createOscillator();
-  surge.frequency.value = 2.8;
-  const surgeGain = ctx.createGain();
-  surgeGain.gain.value = 0.1;
-  surge.connect(surgeGain).connect(slideGain.gain);
-
-  for (const node of [osc1, osc2, slide, body, rattle, surge]) {
+  for (const node of [rumbleSrc, driveSrc, clatterSrc, sprocket, sway, ...hum]) {
     node.start(t);
     stops.push(() => node.stop());
   }
-  motorNodes = { gain, stops };
+
+  motorNodes = { out, hum, humBase, clatter, drive, stops };
 }
 
-export function stopMotor() {
+export function setMotorSpeed(speed: number) {
+  if (!ctx || !motorNodes) return;
+  const s = Math.min(Math.max(speed, 0), 1);
+  const t = ctx.currentTime;
+  motorNodes.out.gain.setTargetAtTime(0.12 + 0.5 * s, t, 0.09);
+  motorNodes.clatter.gain.setTargetAtTime(0.015 + 0.05 * s, t, 0.09);
+  motorNodes.drive.gain.setTargetAtTime(0.06 + 0.12 * s, t, 0.09);
+  motorNodes.hum.forEach((osc, i) => {
+    osc.frequency.setTargetAtTime(motorNodes!.humBase[i] * (0.985 + 0.015 * s), t, 0.12);
+  });
+}
+
+export function stopMotor(impact = true) {
   if (!ctx || !motorNodes) return;
   const t = ctx.currentTime;
-  motorNodes.gain.gain.cancelScheduledValues(t);
-  motorNodes.gain.gain.setValueAtTime(motorNodes.gain.gain.value, t);
-  motorNodes.gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
-  const { stops } = motorNodes;
+  const m = motorNodes;
   motorNodes = null;
-  setTimeout(() => stops.forEach((s) => s()), 500);
-  playThunk();
+
+  m.hum.forEach((osc, i) => osc.frequency.setTargetAtTime(m.humBase[i] * 0.82, t, 0.1));
+  m.out.gain.cancelScheduledValues(t);
+  m.out.gain.setValueAtTime(Math.max(m.out.gain.value, 0.0001), t);
+  m.out.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+  setTimeout(() => m.stops.forEach((s) => s()), 500);
+
+  if (impact) playLimitStop();
 }
 
-export function playThunk() {
+function playLimitStop() {
   if (!ctx || !master) return;
   const t = ctx.currentTime;
 
-  const osc = ctx.createOscillator();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(95, t);
-  osc.frequency.exponentialRampToValueAtTime(42, t + 0.14);
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(0.35, t);
-  g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-  osc.connect(g);
-  g.connect(master);
-  if (roomSend) g.connect(roomSend);
-  osc.start(t);
-  osc.stop(t + 0.32);
+  const thud = ctx.createBufferSource();
+  thud.buffer = noiseBuffer(0.35);
+  const lp = ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.setValueAtTime(900, t);
+  lp.frequency.exponentialRampToValueAtTime(180, t + 0.18);
+  const tg = ctx.createGain();
+  tg.gain.setValueAtTime(0.22, t);
+  tg.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+  thud.connect(lp).connect(tg);
+  tg.connect(master);
+  if (roomSend) tg.connect(roomSend);
+  thud.start(t);
+  thud.stop(t + 0.3);
 
-  click({ freq: 300, gain: 0.18, noiseDur: 0.05, highpass: 120, toRoom: true });
+  const body = ctx.createOscillator();
+  body.type = "sine";
+  body.frequency.setValueAtTime(74, t);
+  body.frequency.exponentialRampToValueAtTime(46, t + 0.12);
+  const bg = ctx.createGain();
+  bg.gain.setValueAtTime(0.16, t);
+  bg.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+  body.connect(bg);
+  bg.connect(master);
+  if (roomSend) bg.connect(roomSend);
+  body.start(t);
+  body.stop(t + 0.24);
+
+  playChainTick(0.5, 0.06);
+  setTimeout(() => playChainTick(0.35, 0.16), 120);
 }
 
-export function playChainTick() {
-  click({
-    freq: 1800 + Math.random() * 900,
-    gain: 0.05 + Math.random() * 0.03,
-    noiseDur: 0.012,
-    highpass: 1400,
-  });
+export function playChainTick(speed = 1, when = 0) {
+  if (!ctx || !master) return;
+  const s = Math.min(Math.max(speed, 0), 1);
+  const t = ctx.currentTime + when;
+  const dur = 0.03;
+
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuffer(dur + 0.02);
+  const bp = ctx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 2400 + Math.random() * 1600;
+  bp.Q.value = 5;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime((0.02 + Math.random() * 0.014) * (0.3 + 0.7 * s), t);
+  g.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+  noise.connect(bp).connect(g);
+  g.connect(master);
+  if (roomSend) g.connect(roomSend);
+  noise.start(t);
+  noise.stop(t + dur + 0.02);
 }
 
 export function playSpotClack() {
