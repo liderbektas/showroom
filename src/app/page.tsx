@@ -1,5 +1,5 @@
-import GarageDoor from "@/components/intro/garage-door";
+import IntroGate from "@/components/intro/intro-gate";
 
 export default function Home() {
-  return <GarageDoor />;
+  return <IntroGate />;
 }

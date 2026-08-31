@@ -417,11 +417,16 @@ export default function GarageInterior({
   const glowMats = useRef<Record<string, THREE.MeshStandardMaterial | null>>({});
   const spot = useRef<THREE.SpotLight>(null);
   const blockerMat = useRef<THREE.MeshBasicMaterial>(null);
+  const meshRoot = useRef<THREE.Group>(null);
   const hazeMats = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
   const started = useRef<number | null>(null);
 
   useFrame((state) => {
     const p = THREE.MathUtils.clamp(progress.current.p, 0, 1);
+
+    if (meshRoot.current) {
+      meshRoot.current.visible = phase === "opening" || phase === "inside";
+    }
 
     if (blockerMat.current) {
       blockerMat.current.opacity = Math.pow(1 - p, 1.5);
@@ -449,6 +454,7 @@ export default function GarageInterior({
 
   return (
     <group>
+      <group ref={meshRoot} visible={false}>
       <mesh position={[0, 0.005, MID_Z]} rotation-x={-Math.PI / 2} receiveShadow>
         <planeGeometry args={[ROOM_W, ROOM_D]} />
         <meshStandardMaterial map={floorMap} color="#c9cbcd" roughness={0.82} envMapIntensity={0.35} />
@@ -636,6 +642,8 @@ export default function GarageInterior({
           </group>
         );
       })}
+
+      </group>
 
       {[-1, 1].map((s, i) => (
         <rectAreaLight

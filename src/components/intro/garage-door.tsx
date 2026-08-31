@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Environment, Lightformer, PerformanceMonitor } from "@react-three/drei";
+import { Environment, Lightformer } from "@react-three/drei";
 import { Bloom, EffectComposer, N8AO, SMAA, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import gsap from "gsap";
@@ -30,7 +30,7 @@ const ARC = TRACK_R * (Math.PI / 2);
 const LIFT_MAX = DOOR_H + ARC + 0.2;
 const DOOR_TRAVEL = 2.9;
 
-const INSPECT_INTERIOR = true;
+const INSPECT_INTERIOR = false;
 
 const WALL_W = 30;
 const WALL_H = 12;
@@ -779,6 +779,8 @@ function ShadowControl({ progress }: { progress: React.RefObject<{ p: number }> 
   const gl = useThree((state) => state.gl);
   const lastP = useRef(-1);
   const warmup = useRef(0);
+  const frame = useRef(0);
+  const pendingFinal = useRef(false);
 
   useEffect(() => {
     setShadowAuto(gl, false);
@@ -786,9 +788,24 @@ function ShadowControl({ progress }: { progress: React.RefObject<{ p: number }> 
   }, [gl]);
 
   useFrame(() => {
+    frame.current++;
     const p = progress.current.p;
-    if (warmup.current < 12 || Math.abs(p - lastP.current) > 1e-4) {
+    const moved = Math.abs(p - lastP.current) > 1e-4;
+    if (warmup.current < 12) {
       warmup.current++;
+      lastP.current = p;
+      kickShadows(gl);
+      return;
+    }
+    if (moved) {
+      if (frame.current % 2 === 0) {
+        lastP.current = p;
+        kickShadows(gl);
+      } else {
+        pendingFinal.current = true;
+      }
+    } else if (pendingFinal.current) {
+      pendingFinal.current = false;
       lastP.current = p;
       kickShadows(gl);
     }
@@ -847,7 +864,7 @@ function Sequence({
     if (!INSPECT_INTERIOR) {
       tl.to(rig.current, { parallax: 0, duration: 1.2, ease: "none" }, 2.3);
       if (fade.current) {
-        tl.to(fade.current, { opacity: 1, duration: 0.6, ease: "power1.in" }, 5.9);
+        tl.to(fade.current, { opacity: 1, duration: 1.0, ease: "power1.inOut" }, 5.6);
       }
     }
 
@@ -980,19 +997,6 @@ function Details() {
 
   return (
     <group>
-      {[-1, 1].map((s) => (
-        <group key={s} position={[s * (DOOR_W / 2 - 0.1), 0.16, -0.16]}>
-          <mesh castShadow>
-            <boxGeometry args={[0.06, 0.09, 0.06]} />
-            <meshStandardMaterial color="#2a2d31" metalness={0.5} roughness={0.5} />
-          </mesh>
-          <mesh position={[0, 0.012, 0.031]}>
-            <circleGeometry args={[0.011, 12]} />
-            <meshStandardMaterial color="#3a0c08" emissive="#ff2a1a" emissiveIntensity={2.2} />
-          </mesh>
-        </group>
-      ))}
-
       <group position={[2.62, 1.24, 0.1]}>
         <mesh castShadow>
           <boxGeometry args={[0.13, 0.19, 0.05]} />
@@ -1048,6 +1052,7 @@ function Dust({ progress }: { progress: React.RefObject<{ p: number }> }) {
     if (!mat.current || !pts.current) return;
     const t = clock.elapsedTime;
     mat.current.opacity = Math.min(Math.max(progress.current.p - 0.12, 0) * 1.6, 0.4);
+    pts.current.visible = mat.current.opacity > 0.002;
     pts.current.position.x = Math.sin(t * 0.06) * 0.12;
     pts.current.position.y = 0.15 + Math.sin(t * 0.045) * 0.08;
     pts.current.rotation.y = t * 0.016;
@@ -1280,7 +1285,6 @@ export default function GarageDoor() {
   const setPhase = useIntroStore((s) => s.setPhase);
   const idle = phase === "loading" || phase === "ready";
 
-  const [dpr, setDpr] = useState(1.5);
   const progress = useRef({ p: 0 });
   const rig = useRef({ z: 8.2, parallax: 1 });
   const fade = useRef<HTMLDivElement>(null);
@@ -1310,7 +1314,7 @@ export default function GarageDoor() {
     <div className="fixed inset-0 bg-[#cfd3d6]">
       <Canvas
         shadows
-        dpr={dpr}
+        dpr={[1, 1.5]}
         gl={{
           antialias: false,
           stencil: false,
@@ -1320,12 +1324,6 @@ export default function GarageDoor() {
         camera={{ fov: 39, position: [0, 1.5, 8.2] }}
       >
         <fog attach="fog" args={["#0a0c10", 16, 46]} />
-        <PerformanceMonitor
-          onIncline={() => setDpr(Math.min(2, window.devicePixelRatio))}
-          onDecline={() => setDpr(1.35)}
-          flipflops={2}
-          onFallback={() => setDpr(1.35)}
-        />
         <ShadowControl progress={progress} />
         <CameraRig rig={rig} />
         <Sequence progress={progress} rig={rig} fade={fade} />
