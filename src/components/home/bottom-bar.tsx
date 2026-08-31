@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import gsap from "gsap";
-import { ChevronLeft, ChevronRight, Info, Scan } from "lucide-react";
+import { ChevronLeft, ChevronRight, Info, RotateCw, Scan } from "lucide-react";
 import { VEHICLES, getVehicle, type VehicleSpec } from "@/data/vehicles";
 import { useShowroomStore } from "@/lib/showroom-store";
 
@@ -17,9 +17,9 @@ function Counter({ spec, vehicleId }: { spec: VehicleSpec; vehicleId: string }) 
     const state = { v: 0 };
     const tween = gsap.to(state, {
       v: spec.value,
-      duration: 1.3,
+      duration: 1.2,
       ease: "power2.out",
-      delay: 0.35,
+      delay: 0.3,
       onUpdate: () => {
         node.textContent = state.v.toFixed(spec.decimals ?? 0);
       },
@@ -37,25 +37,28 @@ function Counter({ spec, vehicleId }: { spec: VehicleSpec; vehicleId: string }) 
   );
 }
 
-const SQUARE_BTN =
-  "flex size-12 items-center justify-center border border-white/20 bg-black/40 text-white/70 backdrop-blur-md transition hover:border-white/60 hover:text-white";
+const CELL = "flex h-full items-center justify-center border-l border-white/10";
+const ACTION =
+  "group flex h-full w-full items-center justify-center gap-2.5 text-[11px] uppercase tracking-[0.25em] transition-colors duration-300";
 
 export default function BottomBar() {
   const vehicleId = useShowroomStore((s) => s.vehicleId);
   const hotspotId = useShowroomStore((s) => s.hotspotId);
+  const autoOrbit = useShowroomStore((s) => s.autoOrbit);
   const setVehicle = useShowroomStore((s) => s.setVehicle);
   const setHotspot = useShowroomStore((s) => s.setHotspot);
+  const toggleAutoOrbit = useShowroomStore((s) => s.toggleAutoOrbit);
 
   const vehicle = getVehicle(vehicleId);
   const index = VEHICLES.findIndex((v) => v.id === vehicleId);
-  const idRow = useRef<HTMLDivElement>(null);
+  const nameRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!idRow.current) return;
+    if (!nameRef.current) return;
     const tween = gsap.fromTo(
-      idRow.current,
-      { y: 12, opacity: 0 },
-      { y: 0, opacity: 1, duration: 0.8, ease: "power3.out", delay: 0.2 }
+      nameRef.current,
+      { y: 10, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.7, ease: "power3.out" }
     );
     return () => {
       tween.kill();
@@ -67,73 +70,88 @@ export default function BottomBar() {
     setVehicle(VEHICLES[next].id);
   };
 
-  const dimmed = hotspotId ? "pointer-events-none opacity-0" : "opacity-100";
-
   return (
-    <div className="fixed inset-x-8 bottom-8 z-20">
-      <div className="flex items-end justify-between pb-5">
-        <div ref={idRow} key={vehicleId} className={`transition-opacity duration-500 ${dimmed}`}>
-          <p className="text-[10px] tracking-[0.45em] text-white/35 tabular-nums">
-            {String(index + 1).padStart(2, "0")} / {String(VEHICLES.length).padStart(2, "0")}
-          </p>
-          <p
-            className="mt-2 text-sm font-medium uppercase tracking-[0.12em] text-white/85"
-            style={DISPLAY}
+    <footer className="fixed inset-x-0 bottom-0 z-20 h-[4.5rem] border-t border-white/10 bg-black/35 backdrop-blur-md">
+      <div className="flex h-full">
+        <button
+          onClick={() => cycle(-1)}
+          aria-label="Önceki araç"
+          className="flex h-full w-[4.5rem] shrink-0 items-center justify-center text-white/50 transition-colors duration-300 hover:bg-white/[0.05] hover:text-white"
+        >
+          <ChevronLeft size={18} strokeWidth={1.6} />
+        </button>
+        <button
+          onClick={() => cycle(1)}
+          aria-label="Sonraki araç"
+          className={`${CELL} w-[4.5rem] shrink-0 text-white/50 transition-colors duration-300 hover:bg-white/[0.05] hover:text-white`}
+        >
+          <ChevronRight size={18} strokeWidth={1.6} />
+        </button>
+
+        <div className={`${CELL} min-w-0 flex-1 justify-start px-7`}>
+          <div ref={nameRef} key={vehicleId} className="flex min-w-0 items-baseline gap-4">
+            <span className="text-[10px] tracking-[0.35em] text-[color:var(--accent)] tabular-nums">
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <span
+              className="truncate text-xs font-normal uppercase tracking-[0.08em] text-white/85"
+              style={DISPLAY}
+            >
+              {vehicle.name}
+            </span>
+          </div>
+        </div>
+
+        {vehicle.specs.map((spec) => (
+          <div key={spec.label} className={`${CELL} hidden w-32 shrink-0 flex-col gap-1 lg:flex`}>
+            <p className="text-lg font-semibold text-white/90" style={DISPLAY}>
+              <Counter spec={spec} vehicleId={vehicleId} />
+            </p>
+            <p className="text-[9px] tracking-[0.4em] text-white/30">{spec.label}</p>
+          </div>
+        ))}
+
+        <div className={`${CELL} hidden w-[4.5rem] shrink-0 md:flex`}>
+          <button
+            onClick={toggleAutoOrbit}
+            aria-label="360 derece döndür"
+            title="360° döndür"
+            className={`flex h-full w-full items-center justify-center transition-colors duration-300 ${
+              autoOrbit
+                ? "bg-white/[0.04] text-white"
+                : "text-white/50 hover:bg-white/[0.05] hover:text-white"
+            }`}
           >
-            {vehicle.name}
-          </p>
-        </div>
-
-        <div className={`flex items-end transition-opacity duration-500 ${dimmed}`}>
-          {vehicle.specs.map((spec, i) => (
-            <div
-              key={spec.label}
-              className={`px-8 text-right ${i > 0 ? "border-l border-white/10" : ""} ${
-                i === vehicle.specs.length - 1 ? "pr-0" : ""
-              }`}
-            >
-              <p className="text-2xl font-bold text-white/90" style={DISPLAY}>
-                <Counter spec={spec} vehicleId={vehicleId} />
-              </p>
-              <p className="mt-1 text-[9px] tracking-[0.4em] text-white/35">{spec.label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="h-px w-full bg-white/10" />
-
-      <div className="flex items-center justify-between pt-5">
-        <div className={`flex gap-2 transition-opacity duration-500 ${dimmed}`}>
-          <button onClick={() => cycle(-1)} aria-label="Önceki araç" className={SQUARE_BTN}>
-            <ChevronLeft size={20} strokeWidth={1.6} />
-          </button>
-          <button onClick={() => cycle(1)} aria-label="Sonraki araç" className={SQUARE_BTN}>
-            <ChevronRight size={20} strokeWidth={1.6} />
+            <RotateCw
+              size={17}
+              strokeWidth={1.6}
+              className={autoOrbit ? "animate-spin-slow" : "transition-transform duration-500 hover:rotate-45"}
+            />
           </button>
         </div>
-
-        <div className="flex">
-            <button
-              onClick={() => setHotspot(vehicle.hotspots[0]?.id ?? null)}
-              className={`flex h-12 items-center gap-2 border px-6 text-[11px] uppercase tracking-[0.25em] backdrop-blur-md transition ${
-                hotspotId
-                  ? "border-white bg-white text-black"
-                  : "border-white/20 bg-black/40 text-white/75 hover:border-white/60 hover:text-white"
-              }`}
-            >
-              <Info size={13} strokeWidth={1.8} />
-              Details
-            </button>
-            <button
-              onClick={() => setHotspot(null)}
-              className="-ml-px flex h-12 items-center gap-2 border border-white/20 bg-black/40 px-6 text-[11px] uppercase tracking-[0.25em] text-white/75 backdrop-blur-md transition hover:border-white/60 hover:text-white"
-            >
-              <Scan size={13} strokeWidth={1.8} />
-              Overview
-            </button>
+        <div className={`${CELL} hidden w-44 shrink-0 md:flex`}>
+          <button
+            onClick={() => setHotspot(vehicle.hotspots[0]?.id ?? null)}
+            className={`${ACTION} ${
+              hotspotId
+                ? "bg-white/[0.04] text-[color:var(--accent)]"
+                : "text-white/60 hover:bg-white/[0.05] hover:text-white"
+            }`}
+          >
+            <Info size={13} strokeWidth={1.8} />
+            Details
+          </button>
+        </div>
+        <div className={`${CELL} hidden w-44 shrink-0 md:flex`}>
+          <button
+            onClick={() => setHotspot(null)}
+            className={`${ACTION} text-white/60 hover:bg-white/[0.05] hover:text-white`}
+          >
+            <Scan size={13} strokeWidth={1.8} />
+            Overview
+          </button>
         </div>
       </div>
-    </div>
+    </footer>
   );
 }

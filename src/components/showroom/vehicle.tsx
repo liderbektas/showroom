@@ -167,7 +167,7 @@ export default function Vehicle({
       <group ref={rig} rotation-y={vehicle.stage.rotationY}>
         <primitive object={root} onClick={logHotspotPoint} />
         {interactive &&
-          vehicle.hotspots.map((h) => <HotspotMarker key={h.id} hotspot={h} />)}
+          vehicle.hotspots.map((h, i) => <HotspotMarker key={h.id} hotspot={h} index={i} />)}
       </group>
     </group>
   );

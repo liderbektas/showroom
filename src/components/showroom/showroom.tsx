@@ -54,6 +54,7 @@ export default function Showroom() {
         onPointerMissed={() => setHotspot(null)}
       >
         <color attach="background" args={["#0a0b0d"]} />
+        <fog attach="fog" args={["#08090b", 13, 34]} />
         {process.env.NODE_ENV === "development" && (
           <>
             <StatsGl />
@@ -114,7 +115,7 @@ export default function Showroom() {
         <CameraController />
 
         <EffectComposer multisampling={0}>
-          <Bloom mipmapBlur levels={5} intensity={0.35} luminanceThreshold={1.0} />
+          <Bloom mipmapBlur levels={5} intensity={0.5} luminanceThreshold={1.0} />
           <Vignette offset={0.24} darkness={0.68} />
           <SMAA />
         </EffectComposer>

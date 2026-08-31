@@ -1,13 +1,18 @@
 "use client";
 
+import { LayoutGrid } from "lucide-react";
+
 export default function MenuButton() {
   return (
     <button
       aria-label="Menü"
-      className="group fixed right-8 top-7 z-20 flex h-10 w-12 flex-col items-end justify-center gap-2"
+      className="group fixed right-8 top-7 z-20 flex size-10 items-center justify-center text-white/70 transition-colors duration-300 hover:text-white"
     >
-      <span className="h-[2px] w-9 bg-white/80 transition-all duration-300 group-hover:w-6" />
-      <span className="h-[2px] w-6 bg-white/80 transition-all duration-300 group-hover:w-9" />
+      <LayoutGrid
+        size={18}
+        strokeWidth={1.5}
+        className="transition-transform duration-500 group-hover:rotate-90"
+      />
     </button>
   );
 }

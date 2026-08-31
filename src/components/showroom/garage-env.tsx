@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { STAGE_POS } from "@/data/vehicles";
 
 const MODEL = "/models/modern-garage.opt.glb";
 
@@ -12,6 +13,21 @@ useGLTF.preload(MODEL);
 // dokuda taşıyor (R=AO, G=rough, B=metal) — dogrudan map yapılırsa sahne camgöbeği olur;
 // R kanalı tek seferlik canvas'la gri tonlamaya çekilir. Drawcall aynı (3), tri aynı (~600).
 const grayCache = new Map<string, THREE.CanvasTexture>();
+
+function makePoolMap() {
+  const S = 256;
+  const cv = document.createElement("canvas");
+  cv.width = S;
+  cv.height = S;
+  const c = cv.getContext("2d")!;
+  const g = c.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0, "rgba(0,0,0,0)");
+  g.addColorStop(0.5, "rgba(0,0,0,0.10)");
+  g.addColorStop(1, "rgba(0,0,0,0.42)");
+  c.fillStyle = g;
+  c.fillRect(0, 0, S, S);
+  return new THREE.CanvasTexture(cv);
+}
 
 function occlusionToGray(src: THREE.Texture) {
   const cached = grayCache.get(src.uuid);
@@ -25,8 +41,12 @@ function occlusionToGray(src: THREE.Texture) {
   const px = c.getImageData(0, 0, cv.width, cv.height);
   const d = px.data;
   for (let i = 0; i < d.length; i += 4) {
-    d[i + 1] = d[i];
-    d[i + 2] = d[i];
+    const v = d[i] / 255;
+    const curved = v * v * (3 - 2 * v);
+    const graded = Math.pow(curved, 1.25) * 255;
+    d[i] = graded * 0.94;
+    d[i + 1] = graded * 0.96;
+    d[i + 2] = graded * 1.02;
   }
   c.putImageData(px, 0, 0);
   const tex = new THREE.CanvasTexture(cv);
@@ -40,6 +60,7 @@ function occlusionToGray(src: THREE.Texture) {
 }
 export default function GarageEnv() {
   const { scene } = useGLTF(MODEL);
+  const poolTex = useMemo(() => makePoolMap(), []);
 
   const root = useMemo(() => {
     const clone = scene.clone(true);
@@ -53,7 +74,8 @@ export default function GarageEnv() {
         const src = entry as THREE.MeshStandardMaterial;
         if (!src.isMeshStandardMaterial) return entry;
         if (src.name === "Basic_White_Light") {
-          const light = new THREE.MeshBasicMaterial({ color: "#f6f9fd" });
+          const light = new THREE.MeshBasicMaterial();
+          light.color.setRGB(1.55, 1.62, 1.75);
           light.toneMapped = false;
           return light;
         }
@@ -72,6 +94,10 @@ export default function GarageEnv() {
       <mesh position={[0, 2.1, -7.28]}>
         <planeGeometry args={[16, 5]} />
         <meshBasicMaterial color="#0a0b0d" side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[STAGE_POS[0], 0.008, STAGE_POS[2] + 1]} rotation-x={-Math.PI / 2}>
+        <planeGeometry args={[30, 34]} />
+        <meshBasicMaterial map={poolTex} color="#000000" transparent depthWrite={false} />
       </mesh>
     </group>
   );

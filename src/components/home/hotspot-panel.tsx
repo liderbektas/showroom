@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { getVehicle } from "@/data/vehicles";
 import { useShowroomStore } from "@/lib/showroom-store";
 
+const DISPLAY = { fontFamily: "var(--font-display), sans-serif" };
+
 export default function HotspotPanel() {
   const vehicleId = useShowroomStore((s) => s.vehicleId);
   const hotspotId = useShowroomStore((s) => s.hotspotId);
@@ -20,46 +22,47 @@ export default function HotspotPanel() {
 
   return (
     <aside
-      className={`pointer-events-none fixed right-8 top-1/2 z-20 w-[26rem] -translate-y-1/2 transition-all duration-500 ${
+      className={`pointer-events-none fixed bottom-24 right-8 z-20 w-[24rem] transition-all duration-500 ${
         hotspot ? "translate-x-0 opacity-100" : "translate-x-6 opacity-0"
       }`}
     >
       {hotspot && (
-        <div className="pointer-events-auto border border-white/12 bg-black/60 text-[#e8eaec] shadow-2xl backdrop-blur-md">
-          <div className="flex items-start justify-between border-b border-white/10 px-6 py-5">
-            <div>
-              <p className="text-[10px] tracking-[0.4em] text-white/35">
-                {String(index + 1).padStart(2, "0")} — {String(vehicle.hotspots.length).padStart(2, "0")}
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold uppercase tracking-wide">
-                {hotspot.title}
-              </h2>
-            </div>
+        <div className="pointer-events-auto border border-white/10 bg-black/35 text-[#e8eaec] backdrop-blur-md">
+          <div className="flex h-14 items-center gap-4 border-b border-white/10 px-6">
+            <span className="text-[10px] tracking-[0.35em] text-white/40 tabular-nums">
+              {String(index + 1).padStart(2, "0")} / {String(vehicle.hotspots.length).padStart(2, "0")}
+            </span>
+            <h2
+              className="min-w-0 flex-1 truncate text-[13px] font-normal uppercase tracking-[0.08em] text-white/90"
+              style={DISPLAY}
+            >
+              {hotspot.title}
+            </h2>
             <button
               onClick={() => setHotspot(null)}
               aria-label="Kapat"
-              className="p-1 text-white/40 transition hover:text-white"
+              className="-mr-1 flex size-8 items-center justify-center text-white/40 transition-colors duration-300 hover:text-white"
             >
-              <X size={16} strokeWidth={1.8} />
+              <X size={14} strokeWidth={1.6} />
             </button>
           </div>
 
-          <p className="px-6 py-5 text-[15px] leading-7 text-white/65">{hotspot.body}</p>
+          <p className="px-6 py-5 text-[14px] leading-7 text-white/55">{hotspot.body}</p>
 
-          <div className="flex border-t border-white/10">
+          <div className="flex h-12 border-t border-white/10">
             <button
               onClick={() => go(-1)}
               aria-label="Önceki nokta"
-              className="flex flex-1 items-center justify-center border-r border-white/10 py-4 text-white/50 transition hover:bg-white/5 hover:text-white"
+              className="flex flex-1 items-center justify-center border-r border-white/10 text-white/45 transition-colors duration-300 hover:bg-white/[0.05] hover:text-white"
             >
-              <ArrowLeft size={18} strokeWidth={1.8} />
+              <ArrowLeft size={15} strokeWidth={1.6} />
             </button>
             <button
               onClick={() => go(1)}
               aria-label="Sonraki nokta"
-              className="flex flex-1 items-center justify-center py-4 text-white/50 transition hover:bg-white/5 hover:text-white"
+              className="flex flex-1 items-center justify-center text-white/45 transition-colors duration-300 hover:bg-white/[0.05] hover:text-white"
             >
-              <ArrowRight size={18} strokeWidth={1.8} />
+              <ArrowRight size={15} strokeWidth={1.6} />
             </button>
           </div>
         </div>

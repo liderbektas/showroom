@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Showroom from "@/components/showroom/showroom";
 import HotspotPanel from "@/components/home/hotspot-panel";
 import BottomBar from "@/components/home/bottom-bar";
+import VehicleRail from "@/components/home/vehicle-rail";
 import MenuButton from "@/components/home/menu-button";
 import GrainOverlay from "@/components/home/grain-overlay";
 import { VEHICLE_ENABLED } from "@/data/vehicles";
@@ -23,6 +24,7 @@ export default function HomePage() {
 
       <GrainOverlay />
       <MenuButton />
+      {VEHICLE_ENABLED && <VehicleRail />}
       {VEHICLE_ENABLED && <BottomBar />}
       {VEHICLE_ENABLED && <HotspotPanel />}
 
