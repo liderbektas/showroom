@@ -43,3 +43,6 @@ next-env.d.ts
 # 3D kaynak dosyalari (buyuk, web e gitmiyor)
 /assets/source/
 *.blend1
+assets/source/
+public/models/garage.glb
+public/models/modern_garage.glb

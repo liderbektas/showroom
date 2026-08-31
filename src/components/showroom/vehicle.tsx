@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { clone as skeletonClone } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { STAGE_POS, type Vehicle as VehicleData } from "@/data/vehicles";
 import HotspotMarker from "@/components/showroom/hotspot-marker";
 
@@ -61,7 +62,13 @@ const GLASS_TWEAKS: Record<string, (m: THREE.MeshPhysicalMaterial) => void> = {
 // araç değişiminde yalnızca klonlar dispose edilir; geometry/texture cache'te kalır.
 // [perf adım 7] Aynı materyali paylaşan mesh'ler offline `gltf-transform join` ile
 // zaten birleşik: 419 → 73 drawcall, ~880K tri. Runtime merge gereksiz.
-export default function Vehicle({ vehicle }: { vehicle: VehicleData }) {
+export default function Vehicle({
+  vehicle,
+  interactive = true,
+}: {
+  vehicle: VehicleData;
+  interactive?: boolean;
+}) {
   const { scene } = useGLTF(vehicle.model);
   const rig = useRef<THREE.Group>(null);
 
@@ -74,11 +81,17 @@ export default function Vehicle({ vehicle }: { vehicle: VehicleData }) {
   };
 
   const { root, owned } = useMemo(() => {
-    const clone = scene.clone(true);
+    const clone = skeletonClone(scene) as THREE.Group;
     clone.updateMatrixWorld(true);
 
     const box = new THREE.Box3().setFromObject(clone);
     const size = box.getSize(new THREE.Vector3());
+    if (size.y > Math.max(size.x, size.z)) {
+      clone.rotation.x = -Math.PI / 2;
+      clone.updateMatrixWorld(true);
+      box.setFromObject(clone);
+      box.getSize(size);
+    }
     if (size.x > size.z) {
       clone.rotation.y += Math.PI / 2;
       clone.updateMatrixWorld(true);
@@ -100,6 +113,10 @@ export default function Vehicle({ vehicle }: { vehicle: VehicleData }) {
       mesh.castShadow = false;
       mesh.receiveShadow = false;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      if (mats.some((entry) => entry.name === "Ghost")) {
+        mesh.visible = false;
+        return;
+      }
       const cloned = mats.map((entry) => {
         const src = entry as THREE.MeshStandardMaterial;
         if (!src.isMeshStandardMaterial) return entry;
@@ -113,6 +130,17 @@ export default function Vehicle({ vehicle }: { vehicle: VehicleData }) {
         if (mat.emissiveIntensity > 3) mat.emissiveIntensity = 3;
         const glassTweak = GLASS_TWEAKS[mat.name];
         if (glassTweak) glassTweak(mat as THREE.MeshPhysicalMaterial);
+        const override = vehicle.materialOverrides?.[mat.name];
+        if (override) {
+          if (override.color !== undefined) mat.color.set(override.color);
+          if (override.metalness !== undefined) mat.metalness = override.metalness;
+          if (override.roughness !== undefined) mat.roughness = override.roughness;
+          if (override.envMapIntensity !== undefined) mat.envMapIntensity = override.envMapIntensity;
+          if (override.opacity !== undefined) {
+            mat.transparent = true;
+            mat.opacity = override.opacity;
+          }
+        }
         const phys = mat as THREE.MeshPhysicalMaterial;
         if (phys.isMeshPhysicalMaterial && phys.specularColor) {
           phys.specularColor.setRGB(
@@ -138,9 +166,8 @@ export default function Vehicle({ vehicle }: { vehicle: VehicleData }) {
     <group position={STAGE_POS}>
       <group ref={rig} rotation-y={vehicle.stage.rotationY}>
         <primitive object={root} onClick={logHotspotPoint} />
-        {vehicle.hotspots.map((h) => (
-          <HotspotMarker key={h.id} hotspot={h} />
-        ))}
+        {interactive &&
+          vehicle.hotspots.map((h) => <HotspotMarker key={h.id} hotspot={h} />)}
       </group>
     </group>
   );

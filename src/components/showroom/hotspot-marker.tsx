@@ -1,6 +1,7 @@
 "use client";
 
 import { Html } from "@react-three/drei";
+import { Plus } from "lucide-react";
 import type { Hotspot } from "@/data/vehicles";
 import { useShowroomStore } from "@/lib/showroom-store";
 
@@ -15,7 +16,7 @@ export default function HotspotMarker({ hotspot }: { hotspot: Hotspot }) {
       position={hotspot.position}
       center
       zIndexRange={[40, 0]}
-      style={{ transition: "opacity 0.35s", opacity: dimmed ? 0.25 : 1 }}
+      style={{ transition: "opacity 0.35s", opacity: dimmed ? 0.2 : 1 }}
     >
       <button
         onClick={(e) => {
@@ -23,19 +24,21 @@ export default function HotspotMarker({ hotspot }: { hotspot: Hotspot }) {
           setHotspot(isActive ? null : hotspot.id);
         }}
         aria-label={hotspot.title}
-        className="group relative flex size-7 items-center justify-center"
+        className="group relative flex size-8 items-center justify-center"
       >
-        {!isActive && (
-          <span className="absolute inset-0 animate-ping rounded-full bg-white/25" />
-        )}
         <span
-          className={`relative flex size-5 items-center justify-center rounded-full border text-[11px] leading-none backdrop-blur-sm transition-all duration-300 ${
+          className={`absolute inset-1 border transition-colors duration-300 ${
+            isActive ? "border-white" : "border-white/40 group-hover:border-white/80"
+          }`}
+        />
+        <span
+          className={`relative flex size-5 items-center justify-center border backdrop-blur-sm transition-all duration-300 ${
             isActive
-              ? "border-white bg-white text-black"
-              : "border-white/70 bg-black/45 text-white group-hover:scale-125 group-hover:bg-black/70"
+              ? "rotate-45 border-white bg-white text-black"
+              : "border-white/70 bg-black/50 text-white group-hover:bg-black/80"
           }`}
         >
-          +
+          <Plus size={11} strokeWidth={2.2} />
         </span>
       </button>
     </Html>

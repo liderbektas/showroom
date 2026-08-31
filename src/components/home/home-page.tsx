@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Showroom from "@/components/showroom/showroom";
-import VehicleRail from "@/components/home/vehicle-rail";
 import HotspotPanel from "@/components/home/hotspot-panel";
+import BottomBar from "@/components/home/bottom-bar";
+import MenuButton from "@/components/home/menu-button";
+import GrainOverlay from "@/components/home/grain-overlay";
 import { VEHICLE_ENABLED } from "@/data/vehicles";
 
 
@@ -19,7 +21,9 @@ export default function HomePage() {
     <main className="fixed inset-0 overflow-hidden bg-[#0a0b0d] text-[#e8eaec]">
       <Showroom />
 
-      {VEHICLE_ENABLED && <VehicleRail />}
+      <GrainOverlay />
+      <MenuButton />
+      {VEHICLE_ENABLED && <BottomBar />}
       {VEHICLE_ENABLED && <HotspotPanel />}
 
       <div

@@ -53,7 +53,7 @@ mercedes için kullanılan script bu repo geçmişinde, gerekirse aynısı uyarl
 
 ```bash
 npx @gltf-transform/cli optimize /tmp/<arac>-colored.glb public/models/<arac>.opt.glb \
-  --no-palette --no-simplify --no-weld \
+  --no-palette --no-simplify --no-weld --no-instance \
   --compress meshopt --texture-compress webp --texture-size 2048
 ```
 
@@ -61,6 +61,11 @@ npx @gltf-transform/cli optimize /tmp/<arac>-colored.glb public/models/<arac>.op
   **leke/dalgalanma** yaratıyor (mercedes'te yaşandı). Sahne unlit + demand olduğu için
   2M üçgen sorun değil.
 - `--no-palette`: palet dokusu renk hatalarına açık; materyal factor'ları korunur.
+- `--no-instance`: EXT_mesh_gpu_instancing, auto-fit'in bbox hesabını ve clone'u bozuyor;
+  kapalı kalmalı.
+- Skinned (kemikli) modeller: `vehicle.tsx` bu yüzden `SkeletonUtils.clone` kullanır —
+  düz `scene.clone(true)` skinned parçaları orijinal iskelete bağlı bırakıp odaya saçar
+  (rolls-royce'ta tekerlekler böyle dağıldı). Bu davranışı değiştirme.
 - `join` otomatik çalışır → drawcall'u düşürür (mercedes: 419 → 73).
 
 ## 4. vehicles.ts kaydı
@@ -101,6 +106,11 @@ tabloyla eşleşmeli (Blender'da isimlendirirken buna uy):
 
 Materyaller instance başına klonlanır; araç değişince klonlar dispose edilir,
 useGLTF cache'i korunur.
+
+Modelde bozuk export edilmiş malzeme değeri varsa (ör. ranger'da lastik
+`metalness: 0.84` geldi → gri/silik göründü) `vehicles.ts` kaydına
+`materialOverrides: { <malzemeAdı>: { metalness, roughness, envMapIntensity, color, opacity } }`
+ekle — traverse sırasında otomatik uygulanır.
 
 ## 6. Performans kuralları (60fps sözleşmesi)
 

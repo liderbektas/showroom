@@ -2,12 +2,12 @@
 
 import { Suspense, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { ContactShadows, Environment, Lightformer, StatsGl } from "@react-three/drei";
+import { Environment, Lightformer, StatsGl } from "@react-three/drei";
 import { Bloom, EffectComposer, SMAA, Vignette } from "@react-three/postprocessing";
-import { STAGE_POS, VEHICLE_ENABLED, getVehicle } from "@/data/vehicles";
+import { VEHICLE_ENABLED } from "@/data/vehicles";
 import { useShowroomStore } from "@/lib/showroom-store";
 import GarageEnv from "@/components/showroom/garage-env";
-import Vehicle from "@/components/showroom/vehicle";
+import VehicleStage from "@/components/showroom/vehicle-stage";
 import CameraController from "@/components/showroom/camera-controller";
 
 // [perf adım 1] r3f-perf turbopack ile çöktüğü için (nested drei9 bağımlılığı) dev HUD:
@@ -15,9 +15,8 @@ import CameraController from "@/components/showroom/camera-controller";
 // Başlangıç (ışıklı/PBR/N8AO/dpr2): ~80 drawcall, ~881K tri.
 // [perf adım 2] 4 real-time ışık (hemisphere + 3 rectArea) söküldü; garaj unlit basic,
 // araba yalnız Environment IBL ile. Drawcall 80→76, ışık başına fragment maliyeti 0.
-// [perf adım 3+4] Sahne unlit olunca GPU bütçesi açıldı: dpr tavanı native 2.0,
-// AdaptiveDpr tabanı 1.5 (daha aşağı asla inmez — pixelleşme sınırı). fps<45'te 1.5'e
-// düşer, fps>55'te 2.0'a döner; demand modundaki kare boşlukları (>250ms) pencereyi sıfırlar.
+// [perf adım 3+4] dpr sabit 1.75: adaptif dpr geçişleri render hedeflerini yeniden
+// ayırıp zoom sırasında hissedilir hitch yaratıyordu; sabit değer = sıfır geçiş maliyeti.
 // [perf adım 5] frameloop="demand": boşta 0 render/sn; orbit/gsap/yükleme invalidate eder.
 // [perf adım 8] N8AO kaldırıldı (tam ekran depth+AO+denoise passları gitti);
 // Bloom mipmap zinciri + Vignette + SMAA kaldı.
@@ -37,55 +36,19 @@ function DevPerf() {
   return null;
 }
 
-function AdaptiveDpr() {
-  const setDpr = useThree((s) => s.setDpr);
-  const last = useRef(0);
-  const acc = useRef(0);
-  const count = useRef(0);
-  const level = useRef(2);
-
-  useFrame(() => {
-    const now = performance.now();
-    const dt = now - last.current;
-    last.current = now;
-    if (dt > 250) {
-      acc.current = 0;
-      count.current = 0;
-      return;
-    }
-    acc.current += dt;
-    count.current++;
-    if (count.current < 40) return;
-    const fps = 1000 / (acc.current / count.current);
-    acc.current = 0;
-    count.current = 0;
-    if (fps < 45 && level.current > 1.55) {
-      level.current = 1.5;
-      setDpr(Math.min(1.5, window.devicePixelRatio));
-    } else if (fps > 55 && level.current < 1.95) {
-      level.current = 2;
-      setDpr(Math.min(2, window.devicePixelRatio));
-    }
-  });
-
-  return null;
-}
-
 export default function Showroom() {
-  const vehicleId = useShowroomStore((s) => s.vehicleId);
   const setHotspot = useShowroomStore((s) => s.setHotspot);
-  const vehicle = getVehicle(vehicleId);
 
   return (
     <div className="absolute inset-0">
       <Canvas
         frameloop="demand"
-        dpr={[1, 2]}
+        dpr={[1, 1.75]}
         gl={{
           antialias: false,
           stencil: false,
           powerPreference: "high-performance",
-          toneMappingExposure: 1.05,
+          toneMappingExposure: 0.98,
         }}
         camera={{ fov: 42, position: [0, 1.35, -5.2], near: 0.1, far: 80 }}
         onPointerMissed={() => setHotspot(null)}
@@ -97,24 +60,10 @@ export default function Showroom() {
             <DevPerf />
           </>
         )}
-        <AdaptiveDpr />
 
         <Suspense fallback={null}>
           <GarageEnv />
-          {VEHICLE_ENABLED && <Vehicle vehicle={vehicle} />}
-          {VEHICLE_ENABLED && (
-            <ContactShadows
-              key={vehicleId}
-              position={[STAGE_POS[0], 0.012, STAGE_POS[2]]}
-              scale={11}
-              blur={2}
-              opacity={0.5}
-              far={2.6}
-              resolution={512}
-              frames={1}
-              color="#05060a"
-            />
-          )}
+          {VEHICLE_ENABLED && <VehicleStage />}
         </Suspense>
 
         <Environment resolution={256}>
@@ -166,7 +115,7 @@ export default function Showroom() {
 
         <EffectComposer multisampling={0}>
           <Bloom mipmapBlur levels={5} intensity={0.35} luminanceThreshold={1.0} />
-          <Vignette offset={0.26} darkness={0.62} />
+          <Vignette offset={0.24} darkness={0.68} />
           <SMAA />
         </EffectComposer>
       </Canvas>

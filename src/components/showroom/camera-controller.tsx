@@ -9,8 +9,14 @@ import * as THREE from "three";
 import { STAGE_POS, getVehicle } from "@/data/vehicles";
 import { useShowroomStore } from "@/lib/showroom-store";
 
-function toWorld([x, y, z]: [number, number, number]): [number, number, number] {
-  return [x + STAGE_POS[0], y + STAGE_POS[1], z + STAGE_POS[2]];
+function toWorld([x, y, z]: [number, number, number], rotY: number): [number, number, number] {
+  const cos = Math.cos(rotY);
+  const sin = Math.sin(rotY);
+  return [
+    x * cos + z * sin + STAGE_POS[0],
+    y + STAGE_POS[1],
+    -x * sin + z * cos + STAGE_POS[2],
+  ];
 }
 
 const BOUNDS = {
@@ -48,8 +54,9 @@ export default function CameraController() {
     const vehicle = getVehicle(vehicleId);
     const hotspot = vehicle.hotspots.find((h) => h.id === hotspotId);
     const pose = hotspot ? hotspot.camera : vehicle.camera;
-    const pos = toWorld(pose.pos);
-    const target = toWorld(pose.target);
+    const rot = hotspot ? vehicle.stage.rotationY : 0;
+    const pos = toWorld(pose.pos, rot);
+    const target = toWorld(pose.target, rot);
 
     ctrl.enabled = false;
     const tl = gsap.timeline({
@@ -82,7 +89,7 @@ export default function CameraController() {
       maxDistance={14.5}
       minPolarAngle={0.95}
       maxPolarAngle={1.58}
-      target={toWorld(getVehicle(vehicleId).camera.target)}
+      target={toWorld(getVehicle(vehicleId).camera.target, 0)}
     />
   );
 }
